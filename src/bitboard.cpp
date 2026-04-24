@@ -18,11 +18,13 @@
 
 #include "bitboard.h"
 
+#include <iostream>
 #include <algorithm>
 #include <bitset>
 #include <initializer_list>
 
 #include "misc.h"
+
 
 namespace Stockfish {
 
@@ -104,6 +106,8 @@ namespace {
 // the so called "fancy" approach.
 void init_magics(PieceType pt, Bitboard table[], Magic magics[][2]) {
 
+    std::cout << "Hello Numb: Into magics, PieceType ..." + pieza_tipo(std::to_string(pt)) << std::endl;
+
 #ifndef USE_PEXT
     // Optimal PRNG seeds to pick the correct magics in the shortest time
     int seeds[][RANK_NB] = {{8977, 44560, 54343, 38998, 5731, 95205, 104912, 17020},
@@ -183,6 +187,12 @@ void init_magics(PieceType pt, Bitboard table[], Magic magics[][2]) {
         }
 #endif
     }
+    std::cout << "hello Numb: Out of magics" << std::endl;
+}
+
+std::string pieza_tipo(int nr) {
+    const char* PiezasTipo[] = {"AllPieces", "NoPieceType", "Pawn", "Knight", "Bishop", "Rook", "Queen", "King", "PieceTypeNr"};
+    return PiezasTipo[nr];
 }
 }
 

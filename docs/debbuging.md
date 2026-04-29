@@ -15,21 +15,6 @@ Emscripten uses Clang as its underlying C and C++ compiler. -lgcov is not suppor
 Replace -lgcov with --coverage flag.
 
 
-#### Stack overflow detected.  You can try increasing -sSTACK_SIZE (currently set to 65536)
-
-Change the value of MAXIMUM_MEMORY to 4GB <br>
-We need to find another solution to allow us to use for example a stack of 2GB.
-
-
-#### Memory access out of bounds
-
-Stockfish iterates through a decision tree in a while loop. We don't want to run it as is in a browser. Javascript been single threaded will hang indefinitely waiting for the loop to finish and you'll get a notification about a "RuntimeError: memory access out of bounds" error.
-
-For this reason we move the loop logic in main() into a `wasm_uci_execute()` function that represents one iteration of the loop. This way JS runs that iteration and yields the processor back so doesn't appear blocked.
-
-* I don't know if this is the problem and the solution.
-
-
 #### Memory access out of bounds
 
 Compiling with the option `debug=yes` the error points to:
@@ -37,35 +22,6 @@ Compiling with the option `debug=yes` the error points to:
     bitboard.cpp:79  --> init_magics(ROOK, RookTable, Magics);
 
 Compiling with the option `-fsanitize=undefined,address` the browser reports: `AddressSanitizer: out of memory: allocator is trying to allocate 0xa0100000 bytes` (This is 2685403136 bytes or 2,5 GB).
-
-Default STACK_SIZE for Emscripten is 64 KBytes (65536 bytes).
-
-Firefox attempts to execute sf18.js:92 and the following sequence of function calls occurs until the error is reached:
-    ../src/engine.cpp:71:9
-    ../src/uci.cpp:68:5
-    ../src/main.cpp:49:51
-
-sf18.js:92 is the line who call `Module["read_stdout"] = Module["read_stdout"] || (output => console.log(output));`
-
-Unable to find a solution to this problem I will use Emscripten Tracing tools for debugging.<br>
-We going to use Google Web Tracing Framwork for Chrome.
- 
-
-Other tracing option could be:
-```sh
-git clone https://github.com/waywardmonkeys/emscripten-trace-collector
-sudo apt update
-sudo apt install python2.7
-sudo apt-get install python-pip
-cd emscripten-trace-collector
-python2.7 -m pip install -r requirements.txt
-python2.7 run-server.py
-
-```
-
-Navigate to http://localhost:5000 <br>
-But this option is not very well manteined.
-
 
 #### Emscripten Tracing
 
@@ -110,19 +66,48 @@ if(frames % 60 == 0) {
 }
 ```
 
-#### Stockfish Manual Trace
+I didn't reach to any result trying this way.
+
+#### Stockfish Memory access out of bounds Manual Trace
 
 ```C++
-// main.cpp --> 
-std::cout << engine_info() // call to misc.cpp
-// wasm_uci_execute -->
-Bitboards.init();  // call to init_magics for ROOK & BISHOP
-
-
-
+main.cpp: 
+std::cout << engine_info()  -->  misc.cpp  --> console.log "To WebAssembly by MaLa"
+wasm_uci_execute  -->  Bitboards.init();  --> console.log "Hello Numb: After Square Distance"
+Bitboards.init()  --> init_magics(ROOK, RookTable, Magics)
 ```
 
+Chrome reports:
+```sh
+To WebAssembly by MaLa
+Hello Numb: After Square Distance
+Hello Numb: Into magics, PieceType ...4: Rook
+Aborted(Stack overflow! Stack cookie has been overwritten at 0x12a87e40, expected hex dwords 0x89BACDFE and 0x2135467, but received 0x40808080 0x00000000)
+```
 
+Firefox reports:
+```sh
+To WebAssembly by MaLa
+Hello Numb: After Square Distance
+================================================================= sf18.js:92:69
+==42==ERROR: AddressSanitizer: global-buffer-overflow on address 0x12a83a04 at pc 0x80000180 bp 0x12a839c0 sp 0x12a839cc
+WRITE of size 4 at 0x12a83a04 thread T0
+    <empty stack>
+<empty string>
+0x12a83a04 is located 28 bytes before global variable 'buf' defined in '../../../system/lib/libc/musl/src/stdio/stdin.c' (0x12a83a20) of size 1032
+0x12a83a04 is located 0 bytes after global variable 'mbrtowc.internal_state' defined in '../../../system/lib/libc/musl/src/multibyte/mbrtowc.c' (0x12a83a00) of size 4
+SUMMARY: AddressSanitizer: global-buffer-overflow
+```
+
+Firefox and Chrome behaves differently.<br>
+In Chrome the code crash after the line that prints out "Hello Numb: Into magics, PieceType ...4: Rook" <br>
+While in FF the code crash before but it points the memory address `0x12a83a04` that the code is trying to access which causes the buffer overflow.
+
+The error sims to be in the line: `init_magics(ROOK, RookTable, Magics)` <br>
+ROOK is a constant. <br>
+RookTable is an array (buffer) of Bitboards to store rook attacks  -->  Bitboard RookTable[0x19000]; <br>
+Magics is a 2 dimensional array that holds all magic bitboards relevant data for a single square -->  Magics[SQUARE_NB][2]; <br>
+The call to init_magics is to initialize RookTable and Magics arrays.
 
 
 

@@ -66,6 +66,7 @@ endif
 ifeq ($(debug),yes)
 	LDFLAGS += --emit-symbol-map
 	ifeq ($(COMP),emscripten)
+		SRCS += emscripten/mateola.cpp
 		LDFLAGS += -gsource-map=inline --source-map-base http://localhost:6931/ -fsanitize=undefined,address
 	endif
 endif

@@ -18,12 +18,12 @@
 
 #include "bitboard.h"
 
-#include <iostream>
 #include <algorithm>
 #include <bitset>
 #include <initializer_list>
 
 #include "misc.h"
+#include "emscripten/mateola.h"
 
 
 namespace Stockfish {
@@ -74,11 +74,18 @@ void Bitboards::init() {
     for (unsigned i = 0; i < (1 << 16); ++i)
         PopCnt16[i] = uint8_t(std::bitset<16>(i).count());
 
+// Imprimir_Array(PopCnt16, (1 << 16));  // MateoLa debugging.
+
     for (Square s1 = SQ_A1; s1 <= SQ_H8; ++s1)
         for (Square s2 = SQ_A1; s2 <= SQ_H8; ++s2)
             SquareDistance[s1][s2] = std::max(distance<File>(s1, s2), distance<Rank>(s1, s2));
 
+std::cout << "Hello Numb: After Square Distance" << std::endl;  // MateoLa debugging.
+ 
     init_magics(ROOK, RookTable, Magics);
+
+std::cout << "Hello Numb: Sparcing Init Magic Calls" << std::endl;  // MateoLa debugging.
+
     init_magics(BISHOP, BishopTable, Magics);
 
     for (Square s1 = SQ_A1; s1 <= SQ_H8; ++s1)
@@ -106,7 +113,7 @@ namespace {
 // the so called "fancy" approach.
 void init_magics(PieceType pt, Bitboard table[], Magic magics[][2]) {
 
-    std::cout << "Hello Numb: Into magics, PieceType ..." + pieza_tipo(std::to_string(pt)) << std::endl;
+    std::cout << "Hello Numb: Into magics, PieceType ..." + getPieceType(pt) << std::endl;  // MateoLa debugging.
 
 #ifndef USE_PEXT
     // Optimal PRNG seeds to pick the correct magics in the shortest time
@@ -121,6 +128,8 @@ void init_magics(PieceType pt, Bitboard table[], Magic magics[][2]) {
 
     for (Square s = SQ_A1; s <= SQ_H8; ++s)
     {
+ //       std::cout << "Hello Ray of Light: the square is ..." + getSquare(s) << std::endl;  // MateoLa debugging
+
         // Board edges are not considered in the relevant occupancies
         Bitboard edges = ((Rank1BB | Rank8BB) & ~rank_bb(s)) | ((FileABB | FileHBB) & ~file_bb(s));
 
@@ -188,11 +197,6 @@ void init_magics(PieceType pt, Bitboard table[], Magic magics[][2]) {
 #endif
     }
     std::cout << "hello Numb: Out of magics" << std::endl;
-}
-
-std::string pieza_tipo(int nr) {
-    const char* PiezasTipo[] = {"AllPieces", "NoPieceType", "Pawn", "Knight", "Bishop", "Rook", "Queen", "King", "PieceTypeNr"};
-    return PiezasTipo[nr];
 }
 }
 

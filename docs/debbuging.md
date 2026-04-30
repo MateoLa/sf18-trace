@@ -18,55 +18,11 @@ Replace -lgcov with --coverage flag.
 #### Memory access out of bounds
 
 Compiling with the option `debug=yes` the error points to:
-    bitboard.cpp:146:29  --> reference[size] = Bitboards::sliding_attack(pt, s, b);
+    <p color="red">bitboard.cpp:146:29  --> reference[size] = Bitboards::sliding_attack(pt, s, b);</p>
     bitboard.cpp:79  --> init_magics(ROOK, RookTable, Magics);
 
 Compiling with the option `-fsanitize=undefined,address` the browser reports: `AddressSanitizer: out of memory: allocator is trying to allocate 0xa0100000 bytes` (This is 2685403136 bytes or 2,5 GB).
 
-#### Emscripten Tracing
-
-Set the `--tracing` option at the command line. It communicates results to an external data collection server. <br>
-
-Features: 
-  * Track custom contexts
-  * Allocation annotations to track mallocs
-  * Logging messages
-  * Tasks reporting
-  * Event loop reporting
-  * Google web tracing framework inter-operability
-
-```C++
-#include <emscripten/emscripten.h>
-#include <emscripten/bind.h>   // To export functions, values and objects.
-#include <emscripten/fetch.h>  // Allows native code to transfer files
-#include <emscripten/trace.h>
-```
-
-Configure the trace system into the C++ main loop `emscripten_trace_configure("http://127.0.0.1:5000", "STFISH")`. 
-
-Annotate some memory types to label some memory allocations to strings. Thus, you can pick them out in the UI later `emscripten_trace_annotate_address_type(font, "TTY_FONT")`.
-
-Record start and end loop events. Inside any function loop place: 
-```C++
-emscripten_trace_record_frame_start();
-emscripten_trace_record_frame_end();
-```
-
-Set contexts to track execute position or segment the program:
-```C++
-emscripten_trace_enter_context("Initializing Bitboard");
-emscripten_trace_exit_context();
-``` 
-
-Report memory layout and heap data periodically:
-```C++
-if(frames % 60 == 0) {
-    emscripten_trace_report_memory_layout();
-    emscripten_trace_report_off_heap_data();
-}
-```
-
-I didn't reach to any result trying this way.
 
 #### Stockfish Memory access out of bounds Manual Trace
 
@@ -76,6 +32,8 @@ std::cout << engine_info()  -->  misc.cpp  --> console.log "To WebAssembly by Ma
 wasm_uci_execute  -->  Bitboards.init();  --> console.log "Hello Numb: After Square Distance"
 Bitboards.init()  --> init_magics(ROOK, RookTable, Magics)
 ```
+
+Adding C++ debbuging lines of code:
 
 Chrome reports:
 ```sh
@@ -104,13 +62,32 @@ In Chrome the code crash after the line that prints out "Hello Numb: Into magics
 While in FF the code crash before but it points the memory address `0x12a83a04` that the code is trying to access which causes the buffer overflow.
 
 The error sims to be in the line: `init_magics(ROOK, RookTable, Magics)` <br>
+The function initialize RookTable and Magics array where: <br>
 ROOK is a constant. <br>
-RookTable is an array (buffer) of Bitboards to store rook attacks  -->  Bitboard RookTable[0x19000]; <br>
-Magics is a 2 dimensional array that holds all magic bitboards relevant data for a single square -->  Magics[SQUARE_NB][2]; <br>
-The call to init_magics is to initialize RookTable and Magics arrays.
+RookTable is an array of Bitboards to store rook attacks  -->  Bitboard RookTable[0x19000]; <br>
+Magics[SQUARE_NB][2] is a 2 dimensional array (64 x 2), where the 2 columns are for rooks and bishops. It holds all magic bitboards relevant data for each square.
 
+After adding many debbuging lines, the Buffer Overflow error sims to happen in this block of code:
+```C++
+        Bitboard b = 0;
+        do
+        {
+#ifndef USE_PEXT
+            occupancy[size] = b;
+#endif
+            reference[size] = Bitboards::sliding_attack(pt, s, b);
 
+            if (HasPext)
+                m.attacks[pext(b, m.mask)] = reference[size];
 
+            size++;
+            b = (b - m.mask) & m.mask;
+
+            std::cout << "MateoLa debugging: " + std::to_string(size) << std::endl;  // MateoLa debugging
+        } while (b);
+```
+This confirm that the problem is in Bitboards::sliding_attack(). I saw that the "size" value where the error happens vary.<br>
+Sometimes size=240, another times size=238 
 
 
 #### nnue/layers/../simd.h:49:20: error: unknown type name '__m512i' Error

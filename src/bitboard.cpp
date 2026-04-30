@@ -71,20 +71,22 @@ std::string Bitboards::pretty(Bitboard b) {
 // startup and relies on global objects to be already zero-initialized.
 void Bitboards::init() {
 
+printAllSquares();  // MaLa debugging.
+
     for (unsigned i = 0; i < (1 << 16); ++i)
         PopCnt16[i] = uint8_t(std::bitset<16>(i).count());
 
-// Imprimir_Array(PopCnt16, (1 << 16));  // MateoLa debugging.
+// Imprimir_Array(PopCnt16, (1 << 16));  // MaLa debugging.
 
     for (Square s1 = SQ_A1; s1 <= SQ_H8; ++s1)
         for (Square s2 = SQ_A1; s2 <= SQ_H8; ++s2)
             SquareDistance[s1][s2] = std::max(distance<File>(s1, s2), distance<Rank>(s1, s2));
 
-std::cout << "Hello Numb: After Square Distance" << std::endl;  // MateoLa debugging.
+std::cout << "MaLa debugging: After Square Distance" << std::endl;
  
     init_magics(ROOK, RookTable, Magics);
 
-std::cout << "Hello Numb: Sparcing Init Magic Calls" << std::endl;  // MateoLa debugging.
+std::cout << "MaLa debugging: Sparcing Init Magic Calls" << std::endl;
 
     init_magics(BISHOP, BishopTable, Magics);
 
@@ -113,7 +115,7 @@ namespace {
 // the so called "fancy" approach.
 void init_magics(PieceType pt, Bitboard table[], Magic magics[][2]) {
 
-    std::cout << "Hello Numb: Into magics, PieceType ..." + getPieceType(pt) << std::endl;  // MateoLa debugging.
+    std::cout << "MaLa debugging: Into magics, PieceType ..." + getPieceType(pt) << std::endl;
 
 #ifndef USE_PEXT
     // Optimal PRNG seeds to pick the correct magics in the shortest time
@@ -128,10 +130,10 @@ void init_magics(PieceType pt, Bitboard table[], Magic magics[][2]) {
 
     for (Square s = SQ_A1; s <= SQ_H8; ++s)
     {
- //       std::cout << "Hello Ray of Light: the square is ..." + getSquare(s) << std::endl;  // MateoLa debugging
-
         // Board edges are not considered in the relevant occupancies
         Bitboard edges = ((Rank1BB | Rank8BB) & ~rank_bb(s)) | ((FileABB | FileHBB) & ~file_bb(s));
+
+std::cout << "MaLa debugging: \n" + Bitboards::pretty(edges) << std::endl;
 
         // Given a square 's', the mask is the bitboard of sliding attacks from
         // 's' computed on an empty board. The index must be big enough to contain
@@ -156,6 +158,8 @@ void init_magics(PieceType pt, Bitboard table[], Magic magics[][2]) {
 #ifndef USE_PEXT
             occupancy[size] = b;
 #endif
+
+            if (size >= 236) { emaciateAttacks(pt, s, b); };  // MaLa debugging
             reference[size] = Bitboards::sliding_attack(pt, s, b);
 
             if (HasPext)
@@ -163,7 +167,11 @@ void init_magics(PieceType pt, Bitboard table[], Magic magics[][2]) {
 
             size++;
             b = (b - m.mask) & m.mask;
+
+            std::cout << "MaLa debugging: " + std::to_string(size) << std::endl;
         } while (b);
+
+std::cout << "MaLa debugging: Out of Do Loop" << std::endl;
 
 #ifndef USE_PEXT
         PRNG rng(seeds[Is64Bit][rank_of(s)]);
@@ -196,7 +204,7 @@ void init_magics(PieceType pt, Bitboard table[], Magic magics[][2]) {
         }
 #endif
     }
-    std::cout << "hello Numb: Out of magics" << std::endl;
+    std::cout << "MaLa debugging: Out of magics" << std::endl;
 }
 }
 

@@ -57,37 +57,74 @@ WRITE of size 4 at 0x12a83a04 thread T0
 SUMMARY: AddressSanitizer: global-buffer-overflow
 ```
 
-Firefox and Chrome behaves differently.<br>
-In Chrome the code crash after the line that prints out "Hello Numb: Into magics, PieceType ...4: Rook" <br>
-While in FF the code crash before but it points the memory address `0x12a83a04` that the code is trying to access which causes the buffer overflow.
-
-The error sims to be in the line: `init_magics(ROOK, RookTable, Magics)` <br>
-The function initialize RookTable and Magics array where: <br>
-ROOK is a constant. <br>
-RookTable is an array of Bitboards to store rook attacks  -->  Bitboard RookTable[0x19000]; <br>
-Magics[SQUARE_NB][2] is a 2 dimensional array (64 x 2), where the 2 columns are for rooks and bishops. It holds all magic bitboards relevant data for each square.
-
-After adding many debbuging lines, the Buffer Overflow error sims to happen in this block of code:
+In types.h:
 ```C++
-        Bitboard b = 0;
-        do
-        {
-#ifndef USE_PEXT
-            occupancy[size] = b;
-#endif
-            reference[size] = Bitboards::sliding_attack(pt, s, b);
-
-            if (HasPext)
-                m.attacks[pext(b, m.mask)] = reference[size];
-
-            size++;
-            b = (b - m.mask) & m.mask;
-
-            std::cout << "MateoLa debugging: " + std::to_string(size) << std::endl;  // MateoLa debugging
-        } while (b);
+// clang-format off
+enum PieceType : std::uint8_t {
+    NO_PIECE_TYPE, PAWN, KNIGHT, BISHOP, ROOK, QUEEN, KING,
+    ALL_PIECES = 0,
+    PIECE_TYPE_NB = 8
+};
+// clang-format on
 ```
-This confirm that the problem is in Bitboards::sliding_attack(). I saw that the "size" value where the error happens vary.<br>
-Sometimes size=240, another times size=238 
+
+Google: <br>
+In C++, an array declared within a `clang-format-off` block is accessed exactly like any other array. clang-format is a source code formatter, it only affects how your code looks on screen, not how it compiles or runs.
+
+
+bitboard.cpp around line 172:
+```C++
+if (size==230) b = 0; // MaLa Debbugging  --> This is the key. If I do that the program runs.
+```
+
+So, if we remove this line, we must find what happens after size == 236 when:
+
+```sh
+MaLa debugging: Occupancy 
++---+---+---+---+---+---+---+---+
+|   |   |   |   |   |   |   |   | 8
++---+---+---+---+---+---+---+---+
+|   |   |   |   |   |   |   |   | 7
++---+---+---+---+---+---+---+---+
+|   |   |   |   |   |   |   |   | 6
++---+---+---+---+---+---+---+---+
+|   |   |   |   |   |   |   |   | 5
++---+---+---+---+---+---+---+---+
+|   |   |   |   |   |   |   |   | 4
++---+---+---+---+---+---+---+---+
+| X |   |   |   |   |   |   |   | 3
++---+---+---+---+---+---+---+---+
+| X |   |   |   |   |   |   |   | 2
++---+---+---+---+---+---+---+---+
+|   |   |   | X | X |   | X |   | 1
++---+---+---+---+---+---+---+---+
+  a   b   c   d   e   f   g   h
+
+MaLa debugging: Sliding Attacks 
++---+---+---+---+---+---+---+---+
+|   |   |   |   |   |   |   |   | 8
++---+---+---+---+---+---+---+---+
+|   |   |   |   |   |   |   |   | 7
++---+---+---+---+---+---+---+---+
+|   |   |   |   |   |   |   |   | 6
++---+---+---+---+---+---+---+---+
+|   |   |   |   |   |   |   |   | 5
++---+---+---+---+---+---+---+---+
+|   |   |   |   |   |   |   |   | 4
++---+---+---+---+---+---+---+---+
+|   |   |   |   |   |   |   |   | 3
++---+---+---+---+---+---+---+---+
+| X |   |   |   |   |   |   |   | 2
++---+---+---+---+---+---+---+---+
+|   | X | X | X |   |   |   |   | 1
++---+---+---+---+---+---+---+---+
+  a   b   c   d   e   f   g   h
+```
+
+
+
+
+
 
 
 #### nnue/layers/../simd.h:49:20: error: unknown type name '__m512i' Error

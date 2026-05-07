@@ -70,6 +70,7 @@ std::string Bitboards::pretty(Bitboard b) {
 // Initializes various bitboard tables. It is called at
 // startup and relies on global objects to be already zero-initialized.
 void Bitboards::init() {
+
     for (unsigned i = 0; i < (1 << 16); ++i)
         PopCnt16[i] = uint8_t(std::bitset<16>(i).count());
 
@@ -123,15 +124,14 @@ void init_magics(PieceType pt, Bitboard table[], Magic magics[][2]) {
     Bitboard reference[4096];
     int      size = 0;
 
-    printAllSquares();
     for (Square s = SQ_A1; s <= SQ_H8; ++s)
     {
-        std::cout << "MaLa debugging: Into magics, Square: " + getCuadrado(s) << std::endl;
+//        std::cout << "MaLa debugging: Into magics, Square: " + getCuadrado(s) << std::endl;
 
         // Board edges are not considered in the relevant occupancies
         Bitboard edges = ((Rank1BB | Rank8BB) & ~rank_bb(s)) | ((FileABB | FileHBB) & ~file_bb(s));
 
-        std::cout << "MaLa debugging: Edges \n" + Bitboards::pretty(edges) << std::endl;
+//        std::cout << "MaLa debugging: Edges \n" + Bitboards::pretty(edges) << std::endl;
 
         // Given a square 's', the mask is the bitboard of sliding attacks from
         // 's' computed on an empty board. The index must be big enough to contain
@@ -148,6 +148,11 @@ void init_magics(PieceType pt, Bitboard table[], Magic magics[][2]) {
         m.attacks = s == SQ_A1 ? table : magics[s - 1][pt - BISHOP].attacks + size;
         size      = 0;
 
+//        std::cout << "MaLa debugging: Magic \n" + Bitboards::pretty(m.magic) << std::endl;
+//        std::cout << "MaLa debugging: Magic Mask \n" + Bitboards::pretty(m.mask) << std::endl;
+//        std::string str = Is64Bit ? "true" : "false";
+//        std::cout << "MaLa debugging: Is64Bit: " + str << std::endl;
+
         // Use Carry-Rippler trick to enumerate all subsets of masks[s] and
         // store the corresponding sliding attack bitboard in reference[].
         Bitboard b = 0;
@@ -156,32 +161,16 @@ void init_magics(PieceType pt, Bitboard table[], Magic magics[][2]) {
 #ifndef USE_PEXT
             occupancy[size] = b;
 #endif
-
-            if (size == 236) {
-                std::cout << "MaLa debugging: Size " + std::to_string(size) << std::endl;
-                std::cout << "MaLa debugging: Occupancy \n" + Bitboards::pretty(b) << std::endl;
-            }
             reference[size] = Bitboards::sliding_attack(pt, s, b);
-            if (size == 236) {
-                std::cout << "MaLa debugging: Sliding Attacks \n" + Bitboards::pretty(reference[size]) << std::endl;
-            }
 
             if (HasPext)
                 m.attacks[pext(b, m.mask)] = reference[size];
 
             size++;
-
-            if (size == 237) {
-                std::cout << "MaLa debugging: Next Board \n" + Bitboards::pretty(m.mask) << std::endl;
-//                std::cout << "MaLa debugging: Next Board \n" + Bitboards::pretty(m.mask) << std::endl;
-            }
-
             b = (b - m.mask) & m.mask;
-//            if (size==230) b = 0; // MaLa Debbugging  --> This is the key. If I do that the program runs.
-
         } while (b);
 
-std::cout << "MaLa debugging: Out of Do Loop" << std::endl;
+// std::cout << "MaLa debugging: Out of Do Loop" << std::endl;
 
 #ifndef USE_PEXT
         PRNG rng(seeds[Is64Bit][rank_of(s)]);
@@ -213,6 +202,7 @@ std::cout << "MaLa debugging: Out of Do Loop" << std::endl;
             }
         }
 #endif
+//    std::cout << "MaLa debugging: Magic Board \n" + Bitboards::pretty(m.magic) << std::endl;
     }
     std::cout << "MaLa debugging: Out of magics" << std::endl;
 }

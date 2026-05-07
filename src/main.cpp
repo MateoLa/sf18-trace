@@ -47,7 +47,11 @@ extern "C" void wasm_uci_execute(int argc, char* argv[]) {
         Bitboards::init();
         Position::init();
 
+std::cout << "MaLa debugging: Initialization done" << std::endl;
+
         auto uci = std::make_unique<UCIEngine>(argc, argv);
+
+std::cout << "MaLa debugging: UCI Ready" << std::endl;
 
         Tune::init(uci->engine_options());
 

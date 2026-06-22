@@ -13,7 +13,7 @@ Here we complile it for WebAssembly</p>
 ### Usage
 
 ```sh
-# Into the root directory
+cd server
 emrun sf.html --no_emrun_detect
 ```
 
@@ -50,6 +50,9 @@ WebAssembly is designed to complement and run alongside JavaScript, sharing func
 
 Stockfish is written in C++ to maximize speed execution. The code has been optimized for certain HW architectures but compilation for web browsers has not been taken into account. We modify some files to achieve this objetive.
 
+Broadly speaking, Stockfish is state machine that holds its state in a UCI::Engine class. It returns a chess position evaluation after each movement input. In C++ it runs in a "uci_loop()" function waiting for the user movement. In browsers, we can initialize the engine and execute one loop step for each movement.
+
+
 Added or modified files:
 ```sh
 src/Makefile
@@ -61,9 +64,39 @@ src/emscripten  # directory
 In "src/Makefile" we consider a new architecture and compiler: "wasm" and "emscripten".
 
 
-#### Prerequisites
+##### The uci->loop()
+
+Stockfish loop runs until token == "quit" or an EOF occurs in getline(std::cin, cmd). 
+
+```C++
+    do
+    {
+        if (cli.argc == 1 && !getline(std::cin, cmd))  cmd = "quit"; // Wait for an input or an end-of-file (EOF) indication
+
+        std::istringstream is(cmd);  // Creates a string stream object named "is" with the contents of "cmd"
+
+        token.clear();  // Avoid a stale if getline() returns nothing or a blank line
+        is >> std::skipws >> token;
+
+        if (token == "quit" || token == "stop") engine.stop();
+
+        else if (token == "ponderhit") engine.set_ponderhit(false);
+
+        ...
+
+    } while (token != "quit" && cli.argc == 1);  // The command-line arguments are one-shot
+```
+
+In Desktop, when reading commands from std::cin, `getline(std::cin, cmd)` halt execution and waits indefinitely until the user enters some data. In Emscripten, unlike std::cin wich blocks JS environment, getline(std::cin, x) returns inmmediately with an EOF signal.
+
+
+
+
+### Compiling Stockfish to WebAssembly
 
 To compile sf18-wasm by yourself follow this steps.
+
+#### Prerequisites
 
 Install GCC/g++ compilers required to compile C/C++ programs in Linux
 
@@ -86,7 +119,6 @@ emcc -v
 emcc --version
 ```
 
-
 #### Build sf18-wasm
 
 Build options can be set in /src/emscripten/Makefile
@@ -108,9 +140,11 @@ make ARCH=wasm clean
 ```
 
 
-#### Debbuging 
+#### Debbuging
 
 When trying to compile our own version of Stockfish WebAssembly we face many errors which we summarize [here](/docs/debbuging.md).
+
+Notice that if you do not override the Module["stdin"] function, the window.prompt bound to std::cin is triggered, which shows that it is used somewhere in the Stockfish project.
 
 
 #### Test C++ Stockfish through the console
@@ -119,14 +153,14 @@ Download a compiled [relese of stockfish]('https://github.com/official-stockfish
 
 Or compile stockfish by yourself `make build ARCH=x86-64-avx2 > build.log 2>&1` generating the executable file. Choose the right ARCH.
 
-Execute Stockfich `./stockfish-ubuntu-x86-64-vnni512`
+Execute Stockfich `./stockfish-ubuntu-x86-64-vnni512` or `./stockfish`
 
 Stockfish UCI commands:
 
 ```sh
 ./stockfish  # execute stockfish
 uci
-isready
+isready  # readyok
 setoption name UCI_AnalyseMode value true
 setoption name Analysis Contempt value Off
 setoption name Threads value 32
@@ -143,6 +177,7 @@ quit
 
 To understand Stockfish: <br>
 [Bitboards](/docs/bitboards.md)
+[Bitboards in Chess](/docs/bitboards_in_chess.md)
 
 
 ### Acknowledgements

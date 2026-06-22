@@ -9,6 +9,8 @@
 </div>
 
 
+### Compiling errors
+
 #### wasm-ld: error: unable to find library -lgcov
 
 Emscripten uses Clang as its underlying C and C++ compiler. -lgcov is not supported by clang/llvm for code coverage.<br>
@@ -32,7 +34,6 @@ std::cout << engine_info()  -->  misc.cpp  --> console.log "To WebAssembly by Ma
 wasm_uci_execute  -->  Bitboards.init();  --> console.log "Hello Numb: After Square Distance"
 Bitboards.init()  --> init_magics(ROOK, RookTable, Magics)
 ```
-
 
 In bitboard.cpp: <br>
 Adding many lines of code like: <br>
@@ -79,17 +80,31 @@ I added the line `LDFLAGS += -s STACK_SIZE=128KB` and the error was resolved.
 #### Thread Constructor Failed
 
 The error reported by the browser is: <br>
-system_error was thrown in -fno-exceptions mode with error 138 and message "thread constructor failed"
+`system_error was thrown in -fno-exceptions mode with error 138 and message "thread constructor failed"`
 
 The error stack at the console shows:
 ```sh
 $func919	@	system_error.cpp:364
 $func1121	@	thread.h:217
-$func1401	@	thread.cpp:240
-$func907	@	engine.cpp:151
-$func906	@	uci.cpp:68
+$func1401	@	thread.cpp:240          =>      create_thread();
+$func907	@	engine.cpp:151          =>      resize_threads();
+$func906	@	uci.cpp:68              =>      engine(argv[0]),
 $__main_argc_argv	@	main.cpp:46
 ```
+
+
+#### Implicitly binding raw pointers is illegal
+#### Unbound Type Error
+
+Embind does not automatically map C-style character pointers (`char*`) to Javascript strings.
+
+Use std::string in your C++ function signature instead of char*.<br>
+According to the C++ standard, the main function must be defined as either char** argv or `char* argv[]` in its second parameter.<br>
+In this case you can explicitly allow raw pointers: <br>
+`emscripten::function("wasm_uci_execute", &wasm_uci_execute, emscripten::allow_raw_pointers());`
+
+If you are not using `EMSCRIPTEN_BINDINGS` and prefer char*, use `Module.cwrap` to define the mapping.<br>
+const uci = Module.cwrap("wasm_uci_execute", "void", []);
 
 
 #### nnue/layers/../simd.h:49:20: error: unknown type name '__m512i' Error
@@ -105,10 +120,66 @@ Compile adding -msimd128 for WebAssembly
 em++ --clear-cache
 ```
 
+#### make: file not recognized: file format not recognized
+#### wasm-ld: error: unknown file type: ...
 
-#### Lesson 1
+`make clean`
 
-In types.h:
+
+
+
+### Browsing errors
+
+
+#### Program exited
+
+The error reported by the browser is: <br>
+`program exited (with status: 0), but keepRuntimeAlive() is set (counter=0) due to an async operation, so halting execution`
+
+This information log from Emscripten indicates that your C/C++ main() function has finished execution, but the JS/WebAssembly module ramains active allowing asynchronous tasks to complete.
+
+All this error messages can occurs when JS triggers a compiled wasm function after the runtime has already shut down or crashed:
+* Aborted(segmentation fault)
+* user callback triggered after runtime exited or application aborted.  Ignoring.
+* Uncaught (in promise) RuntimeError: Aborted(segmentation fault)
+
+Lesson: You can call other C/C++ functions after main() has finished, but you must prevent Emscripten from autimatically shutting down the WebAssembly runtime. By default, when main() exits, Emscripten terminates the entire application runtime and cleans up memory. Add the `-s NO_EXIT_RUNTIME=1` flag.
+
+Lesson: To export the function use `EMSCRIPTEN_KEEPALIVE` or `-s EXPORTED_FUNCTIONS="['_function_name']"`
+
+
+
+#### Module["stdin"] override
+
+Overriding Fs.stdin by:
+```js
+var stdinBuff = 'Hello\nworld!\n'.split('').map(c => c.charCodeAt(0));
+var Module["stdin"] = function() { stdinBuff.shift() || null };
+```
+
+You should see the SF output `Unknown command: 'Hello'. Type help for more information`, which means that the program is receiving the string "Hello" as initial input.
+
+
+### References
+
+[Memory Management](https://deepwiki.com/emscripten-core/emscripten/4.2-memory-management)
+
+
+### Notes
+
+##### Lesson 1 - How to Disable Automatic main() Execution
+
+By default, Emscripten compiled applications automatically execute the main() function after the WebAssembly module loads.
+
+Compile with the flag `-s INVOKE_RUN=0` or set `Module['noInitialRun'] = 0` in JavaScript. Both methods allow you to use Module.callMain() later.
+
+You can also rename the main function to something else. You can do this directly in your code or by using `-Dmain=originalMain` preventing the linker from identifying the entry point.
+
+At higher optimization levels (like -O2 or -O3), if _main is not exported and not called internally, the compiler may remove it to reduce file size.
+
+##### Lesson 2
+
+From types.h:
 ```C++
 // clang-format off
 enum PieceType : std::uint8_t {
@@ -119,11 +190,10 @@ enum PieceType : std::uint8_t {
 // clang-format on
 ```
 
-Google: <br>
-In C++, an array declared within a `clang-format-off` block is accessed exactly like any other array. clang-format is a source code formatter, it only affects how your code looks on screen, not how it compiles or runs.
+In C++, an array declared within a `clang-format-off` block is accessed exactly like any other array. "clang-format" is a source code formatter, it only affects how your code looks on screen, not how it compiles or runs.
 
 
-#### Lesson 2
+##### Lesson 3
 
 Emscripten uses WebAssembly's linear memory model: a single contiguous arrayBuffer accessed from both WebAssembly and JavaScript. <br>
 The wasmMemory object is a WebAssembly.Memory instance created during initialization. The updateMemoryViews() function creates typed array views over wasmMemory.buffer whenever memory allocated or grown.
@@ -146,6 +216,22 @@ INITIAL_HEAP defines the specific amount of memory available for dynamic allocat
 The heap is compatible with C/C++ alignment rules. Unaligned reads/writes may work but can be significantly slower. You can use -s SAFE_HEAP=1 during debugging to catch alignment or out-of-bounds issues. Emscripten ASan (Address Sanitizer) does not work with SAFE_HEAP.
 
 
-#### References
+##### Lesson 4 - getline(std::cin, x)
 
-[Memory Management](https://deepwiki.com/emscripten-core/emscripten/4.2-memory-management)
+It means the function successfully read an entire line of text from the input stream. An empty line or if the user presses `Enter` is still sucessfully and stores an empty string "" in x. <br>
+This is the way 
+
+
+`!getline(std::cin, x)` is the standard way to check if a stream read operation has failed or reached the EOF. 
+
+Emscripten stdin often fail after the first prompt because of the browser asynchronous nature. Unlike a desktop terminal that halt execution waiting for input, the JS engine returns inmediately or forces a program exit.
+
+
+##### Lesson 5
+
+Emscripten standard I/O works by going through the virtual /dev/stdin, /dev/stdout and /dev/stderr devices. You can set them up using your own I/O functions by calling FS.init(stdin, stdout, stderr).
+
+All the configuration should be done before the main run() method is executed, typically by implementing Module.preRun.
+
+Another way to override FS.stdin is by using Module["stdin"]. "stdin" quotation marks are mandatory. You should also clear C++ and C stream flags with `std::cin.clear()` and `std::clearerr(stdin)` after eof().
+

@@ -16,7 +16,7 @@ CXXFLAGS += -flto -DUSE_POPCNT
 # Build options
 minify_js = no
 assertion = yes
-multithread = no
+multithread = yes
 wasm_simd = yes
 embedded_nnue = no
 debug = yes
@@ -26,12 +26,12 @@ VPATH := $(VPATH):emscripten:../server
 LDFLAGS += -flto
 LDFLAGS += --pre-js emscripten/pre.js
 # LDFLAGS += --preload-file emscripten/pikafish.nnue@pikafish.nnue
-LDFLAGS += -s ENVIRONMENT="web,worker" -s MODULARIZE=1 -s EXPORT_NAME="Stockfish"
+LDFLAGS += -s ENVIRONMENT="web,worker" -s MODULARIZE=1 -s EXPORT_ES6=1 -s EXPORT_NAME="Stockfish"
 LDFLAGS += -s STACK_SIZE=128KB
-LDFLAGS += -s ALLOW_MEMORY_GROWTH=1 -s INITIAL_MEMORY=128MB -s MAXIMUM_MEMORY=2GB
-LDFLAGS += -s FILESYSTEM=1
-LDFLAGS += -s "EXPORTED_RUNTIME_METHODS=['cwrap']"
-LDFLAGS += -s EXPORTED_FUNCTIONS="['_main', '_wasm_uci_execute']"
+LDFLAGS += -s ALLOW_MEMORY_GROWTH=1 -s INITIAL_MEMORY=256MB -s MAXIMUM_MEMORY=2GB
+LDFLAGS += -s EXPORTED_RUNTIME_METHODS="['cwrap']"
+LDFLAGS += -s EXPORTED_FUNCTIONS="['_main', '_uci_step']"
+LDFLAGS += -s EXIT_RUNTIME=0
 LDFLAGS += -s ALLOW_UNIMPLEMENTED_SYSCALLS
 
 
@@ -49,10 +49,9 @@ endif
 
 ifeq ($(multithread),yes)
 	CXXFLAGS += -pthread
+	LDFLAGS += -s MALLOC=mimalloc
 	LDFLAGS += -s USE_PTHREADS=1 -s SHARED_MEMORY=1 -s PROXY_TO_PTHREAD=1
-	LDFLAGS += -s ALLOW_MEMORY_GROWTH=0
 	LDFLAGS += -s PTHREAD_POOL_SIZE=navigator.hardwareConcurrency
-	LDFLAGS += -s INITIAL_MEMORY=128MB -s MAXIMUM_MEMORY=128MB
 else
 	CXXFLAGS += -DSINGLE_THREAD
 endif
@@ -70,9 +69,9 @@ endif
 ifeq ($(debug),yes)
 	LDFLAGS += --emit-symbol-map
 	ifeq ($(COMP),emscripten)
-		SRCS += emscripten/mateola.cpp
-#		LDFLAGS += -s SAFE_HEAP=1
-		LDFLAGS += -gsource-map=inline --source-map-base http://localhost:6931/ -fsanitize=undefined,address
+		LDFLAGS += -s SAFE_HEAP=1
+		LDFLAGS += -gsource-map=inline --source-map-base http://localhost:6931/ -fsanitize=undefined
+#		LDFLAGS += -gsource-map=inline --source-map-base http://localhost:6931/ -fsanitize=undefined,address
 	endif
 endif
 

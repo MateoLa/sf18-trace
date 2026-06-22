@@ -37,10 +37,11 @@ enum Square : uint8_t;
 using Value = int;
 
 class UCIEngine {
-   public:
+  public:
     UCIEngine(int argc, char** argv);
 
     void loop();
+    void uci_step(std::string token);
 
     static int         to_cp(Value v, const Position& pos);
     static std::string format_score(const Score& s);
@@ -54,7 +55,7 @@ class UCIEngine {
 
     auto& engine_options() { return engine.get_options(); }
 
-   private:
+  private:
     Engine      engine;
     CommandLine cli;
 

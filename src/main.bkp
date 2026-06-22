@@ -32,11 +32,18 @@
 using namespace Stockfish;
 
 
-// Execute UCI::loop() only once.
-extern "C" void uci_step(UCIEngine* instance, std::string token) {
-    return instance -> uci_step(token);
-}
+extern "C" void wasm_uci_execute(int argc, char* argv[]) {
 
+    auto uci = std::make_unique<UCIEngine>(argc, argv);
+
+    Tune::init(uci->engine_options());
+
+    std::cout << "MaLa debugging: Engine Loaded" << std::endl;
+
+    uci->loop();
+
+    std::cout << "MaLa debugging: Exiting UCI Loop" << std::endl;
+}
 
 // Argument Count & Argument Vector
 int main(int argc, char* argv[]) {
@@ -47,15 +54,7 @@ int main(int argc, char* argv[]) {
 
     std::cout << "MaLa debugging: Initialization done" << std::endl;
 
-    auto uci = std::make_unique<UCIEngine>(argc, argv);
-
-    Tune::init(uci->engine_options());
-
-#ifndef __EMSCRIPTEN__
-    uci->loop();
-#endif
-
-    std::cout << "MaLa debugging: Exiting UCI Loop" << std::endl;
+    wasm_uci_execute(argc, argv);
 
     return 0;
 }

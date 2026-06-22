@@ -1,0 +1,59 @@
+<!DOCTYPE html>
+<html lang="en">
+<html>
+    <head>
+        <meta charset="UTF-8">
+        <title>sf18 Wasm</title>
+        <link rel="icon" type="image/x-icon" href="cpp_logo.png">
+        <script type="module">
+            import xx from "./sf18.js"
+
+            var memory = new WebAssembly.Memory({ initial: 256, maximum: 512});
+            var stdinBuff = 'Hello\nworld!\n'.split('').map(c => c.charCodeAt(0));
+            var sf;
+
+            window.addEventListener('DOMContentLoaded', (event) => {
+                const command = document.getElementById("command");
+                const output = document.getElementById("output");
+
+                var Module = {
+                    memory: memory,
+                    "stdin": stdinBuff.shift() || null,
+                    print: (text) => { add_output(text) },
+                    printErr: (err) => { console.warn("MaLa wasm error: ", err); },
+                    onRuntimeInitialized: () => {
+//                        const uci_step(number, str) = Module.cwrap("uci_step", null, ["number", "str"]);
+                        console.log('Module loaded: ', Module);
+                    },
+                };
+
+                // Initialize the module with your options xx(options)
+                xx(Module).then((instance) => { 
+                    sf = instance;
+                    console.log("Module fully loaded");
+                });
+
+                function add_output(text) {
+                    output.value += text + "\n";
+                    output.scrollTop = output.scrollHeight;
+                }
+
+                command.addEventListener("keydown", function(event) {
+                    if (event.key === "Enter") {
+                        add_output("input> " + command.value);
+                        sf.uci_step(command.value);
+                        command.value = "";
+                    }
+                });
+            });
+        </script>
+    </head>
+
+    <body>
+        <br>
+        <input type="text" id="command" size="50" placeholder="UCI command" />
+        <br>
+        <h4>Output</h4>
+        <textarea id="output" readonly rows="50" cols="80"> </textarea>
+    </body>    
+</html>

@@ -90,8 +90,9 @@ void UCIEngine::loop() {
 
     for (int i = 1; i < cli.argc; ++i) {
         cmd += std::string(cli.argv[i]) + " ";
-std::cout << "MaLa debugging: the command stream is: " + cmd << std::endl;
     }
+
+std::cout << "MaLa debugging: the command stream is: " + cmd << std::endl;
 
     do
     {
@@ -115,7 +116,7 @@ void UCIEngine::uci_step(std::string token) {
     std::istringstream is(token);
 
 std::cout << "MaLa debugging: One Step Token: " + token << std::endl;
-
+/*
 #ifdef __EMSCRIPTEN__
     if (std::cin.fail() && !std::cin.eof()) {
         std::cerr << "error " << strerror(errno) << "\n";
@@ -128,7 +129,7 @@ std::cout << "MaLa debugging: One Step Token: " + token << std::endl;
         std::cout << "MaLa debugging: Input EOF." << std::endl;
     }
 #endif
-
+*/
     if (token == "quit" || token == "stop")
         engine.stop();
 

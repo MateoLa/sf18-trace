@@ -126,6 +126,10 @@ em++ --clear-cache
 `make clean`
 
 
+#### Segmentation Fault (core dumped)
+
+auto uci = std::make_unique<UCIEngine>(0, nullptr);
+Stockfish cannot been initialized with arguments (argc, argv) = (0, nullptr).
 
 
 ### Browsing errors

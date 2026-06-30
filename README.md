@@ -58,6 +58,8 @@ Added or modified files:
 src/Makefile
 src/main.cpp
 src/misc.cpp
+src/uci.h
+src/uci.cpp
 src/emscripten  # directory
 ```
 
@@ -72,24 +74,19 @@ Stockfish loop runs until token == "quit" or an EOF occurs in getline(std::cin, 
     do
     {
         if (cli.argc == 1 && !getline(std::cin, cmd))  cmd = "quit"; // Wait for an input or an end-of-file (EOF) indication
-
-        std::istringstream is(cmd);  // Creates a string stream object named "is" with the contents of "cmd"
-
-        token.clear();  // Avoid a stale if getline() returns nothing or a blank line
-        is >> std::skipws >> token;
-
-        if (token == "quit" || token == "stop") engine.stop();
-
-        else if (token == "ponderhit") engine.set_ponderhit(false);
-
         ...
-
     } while (token != "quit" && cli.argc == 1);  // The command-line arguments are one-shot
 ```
 
-In Desktop, when reading commands from std::cin, `getline(std::cin, cmd)` halt execution and waits indefinitely until the user enters some data. In Emscripten, unlike std::cin wich blocks JS environment, getline(std::cin, x) returns inmmediately with an EOF signal.
+In Emscripten `getline(std::cin, cmd)` returns inmmediately with an EOF signal and `std::cin` blocks the JS environment. <br>
+We avoid their usage by introducing an uci_step() function.
 
 
+##### The UCIEngine class
+
+We need to export the UCIEngine class to JS. <br>
+The argument `char* argv[]` (or char** argv) is a pointer to a pointer which is difficult to bind to JS. <br>
+With wasmUCI() we wrapp the UCIEngine class mapping the double pointer argument to an array.
 
 
 ### Compiling Stockfish to WebAssembly

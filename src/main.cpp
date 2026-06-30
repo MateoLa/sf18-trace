@@ -27,35 +27,131 @@
 
 #ifdef __EMSCRIPTEN__
     #include <emscripten.h>
+    #include <emscripten/bind.h>
 #endif
 
 using namespace Stockfish;
 
 
-// Execute UCI::loop() only once.
-extern "C" void uci_step(UCIEngine* instance, std::string token) {
-    return instance -> uci_step(token);
+// Test if myClass already exists after main() exits.
+struct myClass {
+    std::string message = "MaLa engine runing.";
+    float xpos = 0;
+
+    float add(){
+        return xpos += 1;
+    }
+};
+
+/*
+extern "C" {
+    EMSCRIPTEN_KEEPALIVE
+    MyClass* create_instance() {
+        return new MyClass();
+    }
+    
+    EMSCRIPTEN_KEEPALIVE
+    float call_add(MyClass* instance) {
+        return instance->add();
+    }
 }
+*/
 
+/*
+// UCIEngine class wrapper
+std::unique_ptr<UCIEngine> wasm_uci(std::string text) {
 
-// Argument Count & Argument Vector
-int main(int argc, char* argv[]) {
-    std::cout << engine_info() << std::endl;
-
+    std::stringstream ss(text);
+    std::string word;
+    std::vector<std::string> words;
+    words.push_back("");
+    while (ss >> word) { words.push_back(word); }
+    int argc = words.size();
+    char** argv = new char*[argc];
+    for (size_t i = 0; i < argc; ++i) { argv[i] = words[i].data(); }
+    
     Bitboards::init();
     Position::init();
 
-    std::cout << "MaLa debugging: Initialization done" << std::endl;
-
+    std::cout << "MaLa debug: Init done" << std::endl;
     auto uci = std::make_unique<UCIEngine>(argc, argv);
 
     Tune::init(uci->engine_options());
 
+    return uci;
+}
+*/
+
+
+// UCIEngine class wrapper
+class wasmUCI {
+private:
+    UCIEngine* uci;
+
+public:
+    wasmUCI() {
+        Bitboards::init();
+        Position::init();
+
+        std::cout << "MaLa debug: Init done" << std::endl;
+        char** argv = new char*[1];
+        std::string mala = "./MaLa-sf";
+        argv[0] = mala.data();
+
+        auto uci = std::make_unique<UCIEngine>(1, argv);
+
+        Tune::init(uci->engine_options());
+    }
+
+    ~wasmUCI() { delete uci; }
+
+    void uci_step(std::string token) { uci->uci_step(token); }
+};
+
+
+int main(int argc, char* argv[]) {
+    std::cout << engine_info() << std::endl;
+
 #ifndef __EMSCRIPTEN__
+
+/*
+    argv = new char*[1];
+    std::string mala = "./MaLa-sf";
+    argv[0] = mala.data();
+*/
+
+    for (int i = 0; i < argc; i++) { std::cout << argv[i] << std::endl; }
+    std::cout << argc << std::endl;
+
+    Bitboards::init();
+    Position::init();
+
+    std::cout << "MaLa debug: Init done" << std::endl;
+    auto uci = std::make_unique<UCIEngine>(1, argv);
+
+    Tune::init(uci->engine_options());
+
     uci->loop();
 #endif
 
-    std::cout << "MaLa debugging: Exiting UCI Loop" << std::endl;
+    std::cout << "MaLa debug: main exit" << std::endl;
 
     return 0;
+}
+
+
+EMSCRIPTEN_BINDINGS(sf) {
+    emscripten::class_<wasmUCI>("wasmUCI")
+	.constructor<>()
+        .function("uci_step", &wasmUCI::uci_step);
+
+
+//    emscripten::function("wasm_uci", &wasm_uci, emscripten::allow_raw_pointers());
+//    emscripten::function("wasm_step", &wasm_step, emscripten::allow_raw_pointers());
+
+    emscripten::class_<myClass>("myClass")
+	.constructor<>()
+        .property("xpos", &myClass::xpos)
+        .property("message", &myClass::message)
+        .function("add", &myClass::add);
 }

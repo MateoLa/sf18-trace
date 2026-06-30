@@ -9,8 +9,8 @@
             import xx from "./sf18.js"
 
             var memory = new WebAssembly.Memory({ initial: 256, maximum: 512});
-            var stdinBuff = 'Hello\nworld!\n'.split('').map(c => c.charCodeAt(0));
-            var sf;
+
+            var uci, my = null;
 
             window.addEventListener('DOMContentLoaded', (event) => {
                 const command = document.getElementById("command");
@@ -18,19 +18,17 @@
 
                 var Module = {
                     memory: memory,
-                    "stdin": stdinBuff.shift() || null,
                     print: (text) => { add_output(text) },
-                    printErr: (err) => { console.warn("MaLa wasm error: ", err); },
-                    onRuntimeInitialized: () => {
-//                        const uci_step(number, str) = Module.cwrap("uci_step", null, ["number", "str"]);
-                        console.log('Module loaded: ', Module);
-                    },
+                    printErr: (err) => { console.warn("MaLa C++ error: ", err); },
+                    onRuntimeInitialized: () => { console.log('Module loaded: ', Module); },
                 };
 
                 // Initialize the module with your options xx(options)
                 xx(Module).then((instance) => { 
-                    sf = instance;
                     console.log("Module fully loaded");
+                    my = new instance.myClass;
+                    uci = new instance.wasmUCI();
+                    console.log(uci);
                 });
 
                 function add_output(text) {
@@ -41,7 +39,8 @@
                 command.addEventListener("keydown", function(event) {
                     if (event.key === "Enter") {
                         add_output("input> " + command.value);
-                        sf.uci_step(command.value);
+                        console.log(my.add());
+                        uci.uci_step(command.value);
                         command.value = "";
                     }
                 });

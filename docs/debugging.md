@@ -132,6 +132,27 @@ auto uci = std::make_unique<UCIEngine>(0, nullptr);
 Stockfish cannot been initialized with arguments (argc, argv) = (0, nullptr).
 
 
+#### Threads error
+&
+#### Blocking on the main thread is very dangerous, see https://emscripten.org/docs/porting/pthreads.html#blocking-on-the-main-browser-thread
+
+This error is thrown because the Blocking the main browser thread is blocked, but where is the problem?
+
+Like Stockfish stands, Threads constructor launches the thread and waits until it goes to sleep in idle_loop().
+
+When running Stockfish over WebAssembly, the main browser thrread cannot be blocked. If the main thread calls cv.wait() or locks a mutex that a worker thread needs, emscripten stalls.
+
+When a worker thread calls notify_one(), it might require a message event loop turn to propagate the signal across the SharedArrayBuffer barrier via the browsers's web workers. If the main thread is frozen waiting, it can never process the incoming notification.
+
+The Problem:
+Classes declared in EMSCRIPTEN_BINDINGS initialize automatically when the WebAssembly module loads. This relies on C++ static iitialization. Under the hood, Emscripten hooks this process so exported classes are exposed immediately upon the onRuntimeInitialized JS lifecycle event. <br>
+But, what's happens? <br>
+Well, the Module and the class are initialized together, but threads synchronizations fails because main() exits before synchronizations ends.
+
+Solution: <br>
+Add `emscripten_runtime_keepalive_push();` into main().
+
+
 ### Browsing errors
 
 
@@ -151,6 +172,10 @@ Lesson: You can call other C/C++ functions after main() has finished, but you mu
 
 Lesson: To export the function use `EMSCRIPTEN_KEEPALIVE` or `-s EXPORTED_FUNCTIONS="['_function_name']"`
 
+
+#### Blocking on the main thread is very dangerous
+
+To use pthreads ("multithread" option in Makefile) you should work over workers and do not build your module into the main thread. To build the module in the main thread set multithread=no in emscripten/Makefile.
 
 
 #### Module["stdin"] override

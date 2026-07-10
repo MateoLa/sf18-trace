@@ -5,34 +5,13 @@
         <meta charset="UTF-8">
         <title>sf18 Wasm</title>
         <link rel="icon" type="image/x-icon" href="cpp_logo.png">
-        <script type="module">
-            import xx from "./sf18.js"
-
-            let memory = new WebAssembly.Memory({ initial: 256, maximum: 512});
-
-            let engine;
-            let uci, my = null;
+        <script type="text/javascript">
+            const worker = new Worker('/sf18.worker.js', { type: 'module' });
+            worker.onerror = (event) => { console.log("MaLa worker error: ", event.message); };
 
             window.addEventListener('DOMContentLoaded', (event) => {
                 const command = document.getElementById("command");
                 const output = document.getElementById("output");
-
-                let Module = {
-                    memory: memory,
-                    print: (text) => { add_output(text); },
-                    printErr: (err) => { console.warn("MaLa C++ error: ", err); },
-                    onRuntimeInitialized: function() { console.log('Module loaded: ', Module); add_output("Module loaded"); }
-                };
-
-                // Initialize the module with your options xx(options)
-                xx(Module).then((instance) => { 
-                    console.log("Module fully loaded");
-                    add_output("Module fully loaded");
-                    my = new instance.myClass;
-                    uci = new instance.wasmUCI();
-                    console.log(uci);
-                    engine = instance;
-                });
 
                 function add_output(text) {
                     output.value += text + "\n";
@@ -43,10 +22,12 @@
                     if (event.key === "Enter") {
                         add_output("input> " + command.value);
                         console.log(my.add());
-                        engine.one_frame(guess.value);
+                        worker.postMessage(guess.value);
                         command.value = "";
                     }
                 });
+
+                worker.onmessage = (e) => { add_output(e.data); };
             });
         </script>
     </head>

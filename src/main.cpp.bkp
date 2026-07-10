@@ -28,7 +28,6 @@
 #ifdef __EMSCRIPTEN__
     #include <emscripten.h>
     #include <emscripten/bind.h>
-    #include <emscripten/threading.h>
 #endif
 
 using namespace Stockfish;
@@ -65,18 +64,22 @@ struct ARGS
     std::vector<std::string> argv;
 } args;
 
-#ifdef __EMSCRIPTEN__
+
 // UCIEngine class wrapper
 class wasmUCI {
-private:
-    UCIEngine* uci;
-
 public:
     wasmUCI() {
         Bitboards::init();
         Position::init();
-std::cout << "MaLa debug: Init done" << std::endl;
+/*
+        std::cout << "MaLa debug: Init done" << std::endl;
+        char** argv = new char*[1];
+        std::string mala = "./this.program";
+        argv[0] = mala.data();
+        argv[1] = nullptr; // Explicitly null-terminate the array
+*/
 
+        std::cout << "MaLa debug: Init done" << std::endl;
         char** argv = new char*[args.argc];
         for (int i = 0; i < args.argc; ++i) { argv[i] = args.argv[i].data(); }
         argv[args.argc] = nullptr; // Explicitly null-terminate the array
@@ -84,16 +87,15 @@ std::cout << "MaLa debug: Init done" << std::endl;
         auto uci = std::make_unique<UCIEngine>(args.argc, argv);
 
         Tune::init(uci->engine_options());
-
-std::cout << "MaLa: main browser thread? " << emscripten_is_main_browser_thread() << std::endl;
-std::cout << "MaLa: thread running main? " << emscripten_is_main_runtime_thread() << std::endl;
     }
 
     ~wasmUCI() { delete uci; }
 
     void uci_step(std::string token) { uci->uci_step(token); }
+
+private:
+    UCIEngine* uci;
 };
-#endif
 
 
 int main(int argc, char* argv[]) {
@@ -102,18 +104,13 @@ int main(int argc, char* argv[]) {
 args.argc = argc;
 for (int i = 0; i < argc; ++i) { args.argv.emplace_back(argv[i]); }
 
-for (const auto& str: args.argv) { std::cout << str << std::endl; }
+for (int i = 0; i < args.argc; i++) { std::cout << args.argv[i] << std::endl; }
 
-#ifdef __EMSCRIPTEN__
-    std::cout << "MaLa: main browser thread? " << emscripten_is_main_browser_thread() << std::endl;
-    std::cout << "MaLa: thread running main? " << emscripten_is_main_runtime_thread() << std::endl;
-
-    emscripten_runtime_keepalive_push();
-#else
+#ifndef __EMSCRIPTEN__
     Bitboards::init();
     Position::init();
-std::cout << "MaLa debug: Init done" << std::endl;
 
+    std::cout << "MaLa debug: Init done" << std::endl;
     auto uci = std::make_unique<UCIEngine>(argc, argv);
 
     Tune::init(uci->engine_options());
@@ -127,7 +124,6 @@ std::cout << "MaLa debug: main exit" << std::endl;
 }
 
 
-#ifdef __EMSCRIPTEN__
 EMSCRIPTEN_BINDINGS(sf) {
     emscripten::class_<wasmUCI>("wasmUCI")
 	.constructor<>()
@@ -143,6 +139,3 @@ EMSCRIPTEN_BINDINGS(sf) {
         .property("message", &myClass::message)
         .function("add", &myClass::add);
 }
-#endif
-
-

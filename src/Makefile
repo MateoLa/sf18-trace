@@ -643,7 +643,6 @@ endif
 
 ### On mingw use Windows threads, otherwise POSIX
 ifneq ($(comp),mingw)
-ifneq ($(comp),emscripten)
 	CXXFLAGS += -DUSE_PTHREADS
 	# On Android Bionic's C library comes with its own pthread implementation bundled in
 	ifneq ($(OS),Android)
@@ -667,7 +666,6 @@ ifneq ($(comp),emscripten)
 			endif
 		endif
 	endif
-endif
 endif
 
 ### 3.2.1 Debugging

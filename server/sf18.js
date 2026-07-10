@@ -120,6 +120,7 @@ var _scriptName = import.meta.url;
 var scriptDirectory = "";
 
 function locateFile(path) {
+  dbg("locateFile:", path, "scriptDirectory:", scriptDirectory);
   if (Module["locateFile"]) {
     return Module["locateFile"](path, scriptDirectory);
   }
@@ -245,6 +246,7 @@ var EXITSTATUS;
 // Initializes the stack cookie. Called at the startup of main and at the startup of each thread in pthreads mode.
 function writeStackCookie() {
   var max = _emscripten_stack_get_end();
+  dbg(`writeStackCookie: ${ptrToString(max)}`);
   assert((max & 3) == 0);
   // If the stack ends at address zero we write our cookies 4 bytes into the
   // stack.  This prevents interference with SAFE_HEAP and ASAN which also
@@ -360,9 +362,37 @@ function unexportedRuntimeSymbol(sym) {
   // Prefix all dbg() messages with the calling thread info.
   var origDbg = dbg;
   dbg = (...args) => origDbg(getLogPrefix(), ...args);
+  // With RUNTIME_DEBUG also prefix all err() messages.
+  var origErr = err;
+  err = (...args) => origErr(getLogPrefix(), ...args);
 }
 
 initWorkerLogging();
+
+var printObjectList = [];
+
+function prettyPrint(arg) {
+  if (typeof arg == "undefined") return "undefined";
+  if (typeof arg == "boolean") arg = arg + 0;
+  if (!arg) return arg;
+  var index = printObjectList.indexOf(arg);
+  if (index >= 0) return "<" + arg + "|" + index + ">";
+  if (arg.toString() == "[object HTMLImageElement]") {
+    return arg + "\n\n";
+  }
+  if (arg.byteLength) {
+    return "{" + Array.prototype.slice.call(arg, 0, Math.min(arg.length, 400)) + "}";
+  }
+  if (typeof arg == "function") {
+    return "<function>";
+  } else if (typeof arg == "object") {
+    printObjectList.push(arg);
+    return "<" + arg + "|" + (printObjectList.length - 1) + ">";
+  } else if (typeof arg == "number") {
+    if (arg > 0) return ptrToString(arg) + " (" + arg + ")";
+  }
+  return arg;
+}
 
 // end include: runtime_debug.js
 // include: runtime_safe_heap.js
@@ -435,6 +465,7 @@ if (ENVIRONMENT_IS_PTHREAD) {
       if (cmd === "load") {
         // Preload command that is called once per worker to parse and load the Emscripten code.
         workerID = msgData.workerID;
+        dbg("worker: loading module");
         // Until we initialize the runtime, queue up any further incoming messages.
         let messageQueue = [];
         self.onmessage = e => messageQueue.push(e);
@@ -458,7 +489,9 @@ if (ENVIRONMENT_IS_PTHREAD) {
           // handler exists on the pthread worker, then proxy that handler
           // back to the main thread.
           if (!Module[handler] || Module[handler].proxy) {
+            dbg(`worker: installer proxying handler: ${handler}`);
             Module[handler] = (...args) => {
+              dbg(`worker: calling handler on main thread: ${handler}`);
               postMessage({
                 cmd: "callHandler",
                 handler,
@@ -468,7 +501,7 @@ if (ENVIRONMENT_IS_PTHREAD) {
             // Rebind the out / err handlers if needed
             if (handler == "print") out = Module[handler];
             if (handler == "printErr") err = Module[handler];
-          }
+          } else dbg(`worker: using thread-local handler: ${handler}`);
         }
         wasmMemory = msgData.wasmMemory;
         updateMemoryViews();
@@ -489,6 +522,7 @@ if (ENVIRONMENT_IS_PTHREAD) {
         // using the fast `Atomics.notify` notification path.
         __emscripten_thread_mailbox_await(msgData.pthread_ptr);
         if (!initializedJS) {
+          dbg(`worker: Pthread 0x${_pthread_self().toString(16)} initializing embind.`);
           // Embind must initialize itself on all threads, as it generates support JS.
           // We only do this once per worker since they get reused
           __embind_initialize_bindings();
@@ -503,6 +537,7 @@ if (ENVIRONMENT_IS_PTHREAD) {
             // and let the top level handler propagate it back to the main thread.
             throw ex;
           }
+          dbg(`worker: Pthread 0x${_pthread_self().toString(16)} completed its main entry point with an 'unwind', keeping the worker alive for asynchronous operation.`);
         }
       } else if (msgData.target === "setimmediate") {} else if (cmd === "checkMailbox") {
         if (initializedJS) {
@@ -598,6 +633,7 @@ function preRun() {
 }
 
 function initRuntime() {
+  dbg("initRuntime");
   assert(!runtimeInitialized);
   runtimeInitialized = true;
   if (ENVIRONMENT_IS_PTHREAD) return startWorker();
@@ -607,8 +643,11 @@ function initRuntime() {
   TTY.init();
   // End ATINITS hooks
   wasmExports["__wasm_call_ctors"]();
+  dbg("done __wasm_call_ctors");
   // Begin ATPOSTCTORS hooks
   FS.ignorePermissions = false;
+  // End ATPOSTCTORS hooks
+  dbg("done ATPOSTCTORS");
 }
 
 function preMain() {
@@ -755,8 +794,10 @@ async function createWasm() {
   // handle a generated wasm instance, receiving its exports and
   // performing other necessary setup
   /** @param {WebAssembly.Module=} module*/ function receiveInstance(instance, module) {
+    dbg("receiveInstance");
     wasmExports = instance.exports;
     registerTLSInit(wasmExports["_emscripten_tls_init"]);
+    dbg("assigning exports");
     assignWasmExports(wasmExports);
     // We now have the Wasm module loaded up, keep a reference to the compiled module so we can post it to the workers.
     wasmModule = module;
@@ -801,6 +842,7 @@ async function createWasm() {
     return receiveInstance(instance, wasmModule);
   }
   wasmBinaryFile ??= findWasmBinary();
+  dbg("asynchronously preparing wasm");
   var result = await instantiateAsync(wasmBinary, wasmBinaryFile, info);
   var exports = receiveInstantiationResult(result);
   return exports;
@@ -817,6 +859,7 @@ class ExitStatus {
 }
 
 var terminateWorker = worker => {
+  dbg(`terminateWorker: ${worker.workerID}`);
   worker.terminate();
   // terminate() can be asynchronous, so in theory the worker can continue
   // to run for some amount of time after termination.  However from our POV
@@ -830,6 +873,7 @@ var terminateWorker = worker => {
 };
 
 var cleanupThread = pthread_ptr => {
+  dbg(`cleanupThread: ${ptrToString(pthread_ptr)}`);
   assert(!ENVIRONMENT_IS_PTHREAD, "Internal Error! cleanupThread() can only ever be called from main application thread!");
   assert(pthread_ptr, "Internal Error! Null pthread_ptr in cleanupThread!");
   var worker = PThread.pthreads[pthread_ptr];
@@ -859,6 +903,7 @@ var runDependencyWatcher = null;
 var removeRunDependency = id => {
   runDependencies--;
   Module["monitorRunDependencies"]?.(runDependencies);
+  dbg("removeRunDependency", id);
   assert(id, "removeRunDependency requires an ID");
   assert(runDependencyTracking[id]);
   delete runDependencyTracking[id];
@@ -878,6 +923,7 @@ var removeRunDependency = id => {
 var addRunDependency = id => {
   runDependencies++;
   Module["monitorRunDependencies"]?.(runDependencies);
+  dbg("addRunDependency", id);
   assert(id, "addRunDependency requires an ID");
   assert(!runDependencyTracking[id]);
   runDependencyTracking[id] = 1;
@@ -978,6 +1024,7 @@ var stackAlloc = sz => __emscripten_stack_alloc(sz);
 
 function _proc_exit(code) {
   if (ENVIRONMENT_IS_PTHREAD) return proxyToMainThread(0, 0, 1, code);
+  dbg(`proc_exit: ${code}`);
   EXITSTATUS = code;
   if (!keepRuntimeAlive()) {
     PThread.terminateAllThreads();
@@ -990,10 +1037,12 @@ function _proc_exit(code) {
 var runtimeKeepalivePop = () => {
   assert(runtimeKeepaliveCounter > 0);
   runtimeKeepaliveCounter -= 1;
+  dbg(`runtimeKeepalivePop -> counter=${runtimeKeepaliveCounter}`);
 };
 
 function exitOnMainThread(returnCode) {
   if (ENVIRONMENT_IS_PTHREAD) return proxyToMainThread(1, 0, 0, returnCode);
+  dbg("exitOnMainThread");
   runtimeKeepalivePop();
   _exit(returnCode);
 }
@@ -1004,6 +1053,7 @@ function exitOnMainThread(returnCode) {
   if (ENVIRONMENT_IS_PTHREAD) {
     // implicit exit can never happen on a pthread
     assert(!implicit);
+    dbg(`Pthread ${ptrToString(_pthread_self())} called exit(${status}), posting exitOnMainThread.`);
     // When running in a pthread we propagate the exit back to the main thread
     // where it can decide if the whole process should be shut down or not.
     // The pthread may have decided not to exit its own runtime, for example
@@ -1011,6 +1061,7 @@ function exitOnMainThread(returnCode) {
     exitOnMainThread(status);
     throw "unwind";
   }
+  err(`main thread called exit(${status}): keepRuntimeAlive=${keepRuntimeAlive()} (counter=${runtimeKeepaliveCounter})`);
   // if exit() was called explicitly, warn the user if the runtime isn't actually being shut down
   if (keepRuntimeAlive() && !implicit) {
     var msg = `program exited (with status: ${status}), but keepRuntimeAlive() is set (counter=${runtimeKeepaliveCounter}) due to an async operation, so halting execution but not exiting the runtime or preventing further async execution (you can use emscripten_force_exit, if you want to force a true shutdown)`;
@@ -1041,7 +1092,7 @@ var PThread = {
     }
   },
   initMainThread() {
-    var pthreadPoolSize = navigator.hardwareConcurrency;
+    var pthreadPoolSize = navigator.hardwareConcurrency - 1;
     // Start loading up the Worker pool, if requested.
     while (pthreadPoolSize--) {
       PThread.allocateUnusedWorker();
@@ -1057,6 +1108,7 @@ var PThread = {
   },
   terminateAllThreads: () => {
     assert(!ENVIRONMENT_IS_PTHREAD, "Internal Error! terminateAllThreads() can only ever be called from main application thread!");
+    dbg("terminateAllThreads");
     // Attempt to kill all workers.  Sadly (at least on the web) there is no
     // way to terminate a worker synchronously, or to be notified when a
     // worker is actually terminated.  This means there is some risk that
@@ -1095,6 +1147,7 @@ var PThread = {
     __emscripten_thread_free_data(pthread_ptr);
   },
   threadInitTLS() {
+    dbg("threadInitTLS");
     // Call thread init functions (these are the _emscripten_tls_init for each
     // module loaded.
     PThread.tlsInitFunctions.forEach(f => f());
@@ -1103,6 +1156,7 @@ var PThread = {
     worker.onmessage = e => {
       var d = e["data"];
       var cmd = d.cmd;
+      dbg(`main thread: received message '${cmd}' from worker. ${d}`);
       // If this message is intended to a recipient that is not the main
       // thread, forward it to the target thread.
       if (d.targetThread && d.targetThread != _pthread_self()) {
@@ -1179,6 +1233,7 @@ var PThread = {
   allocateUnusedWorker() {
     var worker;
     // If we're using module output, use bundler-friendly pattern.
+    dbg(`Allocating a new web worker from ${import.meta.url}`);
     if (Module["mainScriptUrlOrBlob"]) {
       var pthreadMainJs = Module["mainScriptUrlOrBlob"];
       if (typeof pthreadMainJs != "string") {
@@ -1222,6 +1277,7 @@ function establishStackSpace(pthread_ptr) {
   var stackHigh = (growMemViews(), HEAPU32)[SAFE_HEAP_INDEX((growMemViews(), HEAPU32), (((pthread_ptr) + (52)) >> 2), "loading")];
   var stackSize = (growMemViews(), HEAPU32)[SAFE_HEAP_INDEX((growMemViews(), HEAPU32), (((pthread_ptr) + (56)) >> 2), "loading")];
   var stackLow = stackHigh - stackSize;
+  dbg(`establishStackSpace: ${ptrToString(stackHigh)} -> ${ptrToString(stackLow)}`);
   assert(stackHigh != 0);
   assert(stackLow != 0);
   assert(stackHigh > stackLow, "stackHigh must be higher then stackLow");
@@ -1282,6 +1338,7 @@ var getWasmTableEntry = funcPtr => {
 };
 
 var invokeEntryPoint = (ptr, arg) => {
+  dbg(`invokeEntryPoint: ${ptrToString(ptr)}`);
   // An old thread on this worker may have been canceled without returning the
   // `runtimeKeepaliveCounter` to zero. Reset it now so the new thread won't
   // be affected.
@@ -1323,6 +1380,7 @@ var registerTLSInit = tlsInitFunc => PThread.tlsInitFunctions.push(tlsInitFunc);
 
 var runtimeKeepalivePush = () => {
   runtimeKeepaliveCounter += 1;
+  dbg(`runtimeKeepalivePush -> counter=${runtimeKeepaliveCounter}`);
 };
 
 /**
@@ -1471,6 +1529,7 @@ var ___pthread_create_js = (pthread_ptr, attr, startRoutine, arg) => {
     dbg("pthread_create: environment does not support SharedArrayBuffer, pthreads are not available");
     return 6;
   }
+  dbg("createThread: " + ptrToString(pthread_ptr));
   // List of JS objects that will transfer ownership to the Worker hosting the thread
   var transferList = [];
   var error = 0;
@@ -5884,6 +5943,7 @@ var handleException = e => {
   // 2. "unwind", which is thrown by emscripten_unwind_to_js_event_loop() and others
   //    that wish to return to JS event loop.
   if (e instanceof ExitStatus || e == "unwind") {
+    dbg(`handleException: unwinding: EXITSTATUS=${EXITSTATUS}`);
     return EXITSTATUS;
   }
   checkStackCookie();
@@ -5892,11 +5952,13 @@ var handleException = e => {
       err("Stack overflow detected.  You can try increasing -sSTACK_SIZE (currently set to 131072)");
     }
   }
+  dbg("handleException: got unexpected exception, calling quit_");
   quit_(1, e);
 };
 
 var maybeExit = () => {
   if (!keepRuntimeAlive()) {
+    dbg(`maybeExit: calling exit() implicitly after user callback completed: ${EXITSTATUS}`);
     try {
       if (ENVIRONMENT_IS_PTHREAD) {
         // exit the current thread, but only if there is one active.
@@ -6031,6 +6093,7 @@ var __emscripten_thread_cleanup = thread => {
   // entry point, calls pthread_exit, or acts upon a cancellation.
   // Detached threads are responsible for calling this themselves,
   // otherwise pthread_join is responsible for calling this.
+  dbg(`_emscripten_thread_cleanup: ${ptrToString(thread)}`);
   if (!ENVIRONMENT_IS_PTHREAD) cleanupThread(thread); else postMessage({
     cmd: "cleanupThread",
     thread
@@ -6084,6 +6147,7 @@ var _emscripten_get_now = () => performance.timeOrigin + performance.now();
 
 function __setitimer_js(which, timeout_ms) {
   if (ENVIRONMENT_IS_PTHREAD) return proxyToMainThread(10, 0, 1, which, timeout_ms);
+  dbg(`setitimer_js ${which} timeout=${timeout_ms}`);
   // First, clear any existing timer.
   if (timers[which]) {
     clearTimeout(timers[which].id);
@@ -6095,6 +6159,7 @@ function __setitimer_js(which, timeout_ms) {
   var id = setTimeout(() => {
     assert(which in timers);
     delete timers[which];
+    dbg(`itimer fired: ${which}`);
     callUserCallback(() => __emscripten_timeout(which, _emscripten_get_now()));
   }, timeout_ms);
   timers[which] = {
@@ -6200,6 +6265,7 @@ var getHeapMax = () => // Stay one Wasm page short of 4GB: while e.g. Chrome is 
 var growMemory = size => {
   var oldHeapSize = wasmMemory.buffer.byteLength;
   var pages = ((size - oldHeapSize + 65535) / 65536) | 0;
+  dbg(`growMemory: ${size} (+${size - oldHeapSize} bytes / ${pages} pages)`);
   try {
     // round size grow request up to wasm page size (fixed 64KB per spec)
     wasmMemory.grow(pages);
@@ -6262,6 +6328,8 @@ var _emscripten_resize_heap = requestedSize => {
 };
 
 var _emscripten_runtime_keepalive_check = keepRuntimeAlive;
+
+var _emscripten_runtime_keepalive_push = runtimeKeepalivePush;
 
 var ENV = {};
 
@@ -6563,7 +6631,7 @@ var missingLibrarySymbols = [ "writeI53ToI64", "writeI53ToI64Clamped", "writeI53
 
 missingLibrarySymbols.forEach(missingLibrarySymbol);
 
-var unexportedSymbols = [ "run", "out", "err", "callMain", "abort", "wasmExports", "HEAPF32", "HEAPF64", "HEAP8", "HEAPU8", "HEAP16", "HEAPU16", "HEAP32", "HEAPU32", "HEAP64", "HEAPU64", "WasmSourceMap", "writeStackCookie", "checkStackCookie", "INT53_MAX", "INT53_MIN", "bigintToI53Checked", "stackSave", "stackRestore", "stackAlloc", "createNamedFunction", "ptrToString", "zeroMemory", "exitJS", "getHeapMax", "growMemory", "ENV", "ERRNO_CODES", "strError", "DNS", "Protocols", "Sockets", "timers", "warnOnce", "readEmAsmArgsArray", "getExecutableName", "handleException", "keepRuntimeAlive", "runtimeKeepalivePush", "runtimeKeepalivePop", "callUserCallback", "maybeExit", "asyncLoad", "alignMemory", "mmapAlloc", "wasmTable", "wasmMemory", "getUniqueRunDependency", "noExitRuntime", "addRunDependency", "removeRunDependency", "addOnPreRun", "addOnPostRun", "ccall", "freeTableIndexes", "functionsInTableMap", "setValue", "getValue", "PATH", "PATH_FS", "UTF8Decoder", "UTF8ArrayToString", "UTF8ToString", "stringToUTF8Array", "stringToUTF8", "lengthBytesUTF8", "intArrayFromString", "AsciiToString", "UTF16Decoder", "UTF16ToString", "stringToUTF16", "lengthBytesUTF16", "UTF32ToString", "stringToUTF32", "lengthBytesUTF32", "stringToUTF8OnStack", "writeArrayToMemory", "JSEvents", "specialHTMLTargets", "findCanvasEventTarget", "currentFullscreenStrategy", "restoreOldWindowedStyle", "UNWIND_CACHE", "ExitStatus", "getEnvStrings", "checkWasiClock", "doReadv", "doWritev", "initRandomFill", "randomFill", "emSetImmediate", "emClearImmediate_deps", "emClearImmediate", "promiseMap", "uncaughtExceptionCount", "exceptionLast", "exceptionCaught", "Browser", "requestFullscreen", "requestFullScreen", "setCanvasSize", "getUserMedia", "createContext", "getPreloadedImageData__data", "wget", "MONTH_DAYS_REGULAR", "MONTH_DAYS_LEAP", "MONTH_DAYS_REGULAR_CUMULATIVE", "MONTH_DAYS_LEAP_CUMULATIVE", "SYSCALLS", "preloadPlugins", "FS_createPreloadedFile", "FS_preloadFile", "FS_modeStringToFlags", "FS_getMode", "FS_stdin_getChar_buffer", "FS_stdin_getChar", "FS_unlink", "FS_createPath", "FS_createDevice", "FS_readFile", "FS", "FS_root", "FS_mounts", "FS_devices", "FS_streams", "FS_nextInode", "FS_nameTable", "FS_currentPath", "FS_initialized", "FS_ignorePermissions", "FS_filesystems", "FS_syncFSRequests", "FS_lookupPath", "FS_getPath", "FS_hashName", "FS_hashAddNode", "FS_hashRemoveNode", "FS_lookupNode", "FS_createNode", "FS_destroyNode", "FS_isRoot", "FS_isMountpoint", "FS_isFile", "FS_isDir", "FS_isLink", "FS_isChrdev", "FS_isBlkdev", "FS_isFIFO", "FS_isSocket", "FS_flagsToPermissionString", "FS_nodePermissions", "FS_mayLookup", "FS_mayCreate", "FS_mayDelete", "FS_mayOpen", "FS_checkOpExists", "FS_nextfd", "FS_getStreamChecked", "FS_getStream", "FS_createStream", "FS_closeStream", "FS_dupStream", "FS_doSetAttr", "FS_chrdev_stream_ops", "FS_major", "FS_minor", "FS_makedev", "FS_registerDevice", "FS_getDevice", "FS_getMounts", "FS_syncfs", "FS_mount", "FS_unmount", "FS_lookup", "FS_mknod", "FS_statfs", "FS_statfsStream", "FS_statfsNode", "FS_create", "FS_mkdir", "FS_mkdev", "FS_symlink", "FS_rename", "FS_rmdir", "FS_readdir", "FS_readlink", "FS_stat", "FS_fstat", "FS_lstat", "FS_doChmod", "FS_chmod", "FS_lchmod", "FS_fchmod", "FS_doChown", "FS_chown", "FS_lchown", "FS_fchown", "FS_doTruncate", "FS_truncate", "FS_ftruncate", "FS_utime", "FS_open", "FS_close", "FS_isClosed", "FS_llseek", "FS_read", "FS_write", "FS_mmap", "FS_msync", "FS_ioctl", "FS_writeFile", "FS_cwd", "FS_chdir", "FS_createDefaultDirectories", "FS_createDefaultDevices", "FS_createSpecialDirectories", "FS_createStandardStreams", "FS_staticInit", "FS_init", "FS_quit", "FS_findObject", "FS_analyzePath", "FS_createFile", "FS_createDataFile", "FS_forceLoadFile", "FS_createLazyFile", "FS_absolutePath", "FS_createFolder", "FS_createLink", "FS_joinPath", "FS_mmapAlloc", "FS_standardizePath", "MEMFS", "TTY", "PIPEFS", "SOCKFS", "tempFixedLengthArray", "miniTempWebGLFloatBuffers", "miniTempWebGLIntBuffers", "GL", "AL", "GLUT", "EGL", "GLEW", "IDBStore", "SDL", "SDL_gfx", "waitAsyncPolyfilled", "print", "printErr", "jstoi_s", "PThread", "terminateWorker", "cleanupThread", "registerTLSInit", "spawnThread", "exitOnMainThread", "proxyToMainThread", "proxiedJSCallArgs", "invokeEntryPoint", "checkMailbox", "InternalError", "BindingError", "throwInternalError", "throwBindingError", "registeredTypes", "awaitingDependencies", "typeDependencies", "tupleRegistrations", "structRegistrations", "sharedRegisterType", "whenDependentTypesAreResolved", "getTypeName", "getFunctionName", "heap32VectorToArray", "usesDestructorStack", "checkArgCount", "getRequiredArgCount", "createJsInvoker", "UnboundTypeError", "EmValType", "EmValOptionalType", "throwUnboundTypeError", "ensureOverloadTable", "exposePublicSymbol", "replacePublicSymbol", "embindRepr", "registeredInstances", "getBasestPointer", "getInheritedInstance", "registeredPointers", "registerType", "integerReadValueFromPointer", "floatReadValueFromPointer", "assertIntegerRange", "readPointer", "runDestructors", "craftInvokerFunction", "embind__requireFunction", "genericPointerToWireType", "constNoSmartPtrRawPointerToWireType", "nonConstNoSmartPtrRawPointerToWireType", "init_RegisteredPointer", "RegisteredPointer", "RegisteredPointer_fromWireType", "runDestructor", "releaseClassHandle", "finalizationRegistry", "detachFinalizer_deps", "detachFinalizer", "attachFinalizer", "makeClassHandle", "init_ClassHandle", "ClassHandle", "throwInstanceAlreadyDeleted", "deletionQueue", "flushPendingDeletes", "delayFunction", "RegisteredClass", "shallowCopyInternalPointer", "downcastPointer", "upcastPointer", "validateThis", "char_0", "char_9", "makeLegalFunctionName", "emval_freelist", "emval_handles", "emval_symbols", "Emval", "emval_methodCallers" ];
+var unexportedSymbols = [ "run", "out", "err", "callMain", "abort", "wasmExports", "HEAPF32", "HEAPF64", "HEAP8", "HEAPU8", "HEAP16", "HEAPU16", "HEAP32", "HEAPU32", "HEAP64", "HEAPU64", "WasmSourceMap", "writeStackCookie", "checkStackCookie", "prettyPrint", "INT53_MAX", "INT53_MIN", "bigintToI53Checked", "stackSave", "stackRestore", "stackAlloc", "createNamedFunction", "ptrToString", "zeroMemory", "exitJS", "getHeapMax", "growMemory", "ENV", "ERRNO_CODES", "strError", "DNS", "Protocols", "Sockets", "timers", "warnOnce", "readEmAsmArgsArray", "getExecutableName", "handleException", "keepRuntimeAlive", "runtimeKeepalivePush", "runtimeKeepalivePop", "callUserCallback", "maybeExit", "asyncLoad", "alignMemory", "mmapAlloc", "wasmTable", "wasmMemory", "getUniqueRunDependency", "noExitRuntime", "addRunDependency", "removeRunDependency", "addOnPreRun", "addOnPostRun", "ccall", "freeTableIndexes", "functionsInTableMap", "setValue", "getValue", "PATH", "PATH_FS", "UTF8Decoder", "UTF8ArrayToString", "UTF8ToString", "stringToUTF8Array", "stringToUTF8", "lengthBytesUTF8", "intArrayFromString", "AsciiToString", "UTF16Decoder", "UTF16ToString", "stringToUTF16", "lengthBytesUTF16", "UTF32ToString", "stringToUTF32", "lengthBytesUTF32", "stringToUTF8OnStack", "writeArrayToMemory", "JSEvents", "specialHTMLTargets", "findCanvasEventTarget", "currentFullscreenStrategy", "restoreOldWindowedStyle", "UNWIND_CACHE", "ExitStatus", "getEnvStrings", "checkWasiClock", "doReadv", "doWritev", "initRandomFill", "randomFill", "emSetImmediate", "emClearImmediate_deps", "emClearImmediate", "promiseMap", "uncaughtExceptionCount", "exceptionLast", "exceptionCaught", "Browser", "requestFullscreen", "requestFullScreen", "setCanvasSize", "getUserMedia", "createContext", "getPreloadedImageData__data", "wget", "MONTH_DAYS_REGULAR", "MONTH_DAYS_LEAP", "MONTH_DAYS_REGULAR_CUMULATIVE", "MONTH_DAYS_LEAP_CUMULATIVE", "SYSCALLS", "preloadPlugins", "FS_createPreloadedFile", "FS_preloadFile", "FS_modeStringToFlags", "FS_getMode", "FS_stdin_getChar_buffer", "FS_stdin_getChar", "FS_unlink", "FS_createPath", "FS_createDevice", "FS_readFile", "FS", "FS_root", "FS_mounts", "FS_devices", "FS_streams", "FS_nextInode", "FS_nameTable", "FS_currentPath", "FS_initialized", "FS_ignorePermissions", "FS_filesystems", "FS_syncFSRequests", "FS_lookupPath", "FS_getPath", "FS_hashName", "FS_hashAddNode", "FS_hashRemoveNode", "FS_lookupNode", "FS_createNode", "FS_destroyNode", "FS_isRoot", "FS_isMountpoint", "FS_isFile", "FS_isDir", "FS_isLink", "FS_isChrdev", "FS_isBlkdev", "FS_isFIFO", "FS_isSocket", "FS_flagsToPermissionString", "FS_nodePermissions", "FS_mayLookup", "FS_mayCreate", "FS_mayDelete", "FS_mayOpen", "FS_checkOpExists", "FS_nextfd", "FS_getStreamChecked", "FS_getStream", "FS_createStream", "FS_closeStream", "FS_dupStream", "FS_doSetAttr", "FS_chrdev_stream_ops", "FS_major", "FS_minor", "FS_makedev", "FS_registerDevice", "FS_getDevice", "FS_getMounts", "FS_syncfs", "FS_mount", "FS_unmount", "FS_lookup", "FS_mknod", "FS_statfs", "FS_statfsStream", "FS_statfsNode", "FS_create", "FS_mkdir", "FS_mkdev", "FS_symlink", "FS_rename", "FS_rmdir", "FS_readdir", "FS_readlink", "FS_stat", "FS_fstat", "FS_lstat", "FS_doChmod", "FS_chmod", "FS_lchmod", "FS_fchmod", "FS_doChown", "FS_chown", "FS_lchown", "FS_fchown", "FS_doTruncate", "FS_truncate", "FS_ftruncate", "FS_utime", "FS_open", "FS_close", "FS_isClosed", "FS_llseek", "FS_read", "FS_write", "FS_mmap", "FS_msync", "FS_ioctl", "FS_writeFile", "FS_cwd", "FS_chdir", "FS_createDefaultDirectories", "FS_createDefaultDevices", "FS_createSpecialDirectories", "FS_createStandardStreams", "FS_staticInit", "FS_init", "FS_quit", "FS_findObject", "FS_analyzePath", "FS_createFile", "FS_createDataFile", "FS_forceLoadFile", "FS_createLazyFile", "FS_absolutePath", "FS_createFolder", "FS_createLink", "FS_joinPath", "FS_mmapAlloc", "FS_standardizePath", "MEMFS", "TTY", "PIPEFS", "SOCKFS", "tempFixedLengthArray", "miniTempWebGLFloatBuffers", "miniTempWebGLIntBuffers", "GL", "AL", "GLUT", "EGL", "GLEW", "IDBStore", "SDL", "SDL_gfx", "waitAsyncPolyfilled", "print", "printErr", "jstoi_s", "PThread", "terminateWorker", "cleanupThread", "registerTLSInit", "spawnThread", "exitOnMainThread", "proxyToMainThread", "proxiedJSCallArgs", "invokeEntryPoint", "checkMailbox", "InternalError", "BindingError", "throwInternalError", "throwBindingError", "registeredTypes", "awaitingDependencies", "typeDependencies", "tupleRegistrations", "structRegistrations", "sharedRegisterType", "whenDependentTypesAreResolved", "getTypeName", "getFunctionName", "heap32VectorToArray", "usesDestructorStack", "checkArgCount", "getRequiredArgCount", "createJsInvoker", "UnboundTypeError", "EmValType", "EmValOptionalType", "throwUnboundTypeError", "ensureOverloadTable", "exposePublicSymbol", "replacePublicSymbol", "embindRepr", "registeredInstances", "getBasestPointer", "getInheritedInstance", "registeredPointers", "registerType", "integerReadValueFromPointer", "floatReadValueFromPointer", "assertIntegerRange", "readPointer", "runDestructors", "craftInvokerFunction", "embind__requireFunction", "genericPointerToWireType", "constNoSmartPtrRawPointerToWireType", "nonConstNoSmartPtrRawPointerToWireType", "init_RegisteredPointer", "RegisteredPointer", "RegisteredPointer_fromWireType", "runDestructor", "releaseClassHandle", "finalizationRegistry", "detachFinalizer_deps", "detachFinalizer", "attachFinalizer", "makeClassHandle", "init_ClassHandle", "ClassHandle", "throwInstanceAlreadyDeleted", "deletionQueue", "flushPendingDeletes", "delayFunction", "RegisteredClass", "shallowCopyInternalPointer", "downcastPointer", "upcastPointer", "validateThis", "char_0", "char_9", "makeLegalFunctionName", "emval_freelist", "emval_handles", "emval_symbols", "Emval", "emval_methodCallers" ];
 
 unexportedSymbols.forEach(unexportedRuntimeSymbol);
 
@@ -6843,6 +6911,7 @@ function assignWasmImports() {
     /** @export */ emscripten_num_logical_cores: _emscripten_num_logical_cores,
     /** @export */ emscripten_resize_heap: _emscripten_resize_heap,
     /** @export */ emscripten_runtime_keepalive_check: _emscripten_runtime_keepalive_check,
+    /** @export */ emscripten_runtime_keepalive_push: _emscripten_runtime_keepalive_push,
     /** @export */ environ_get: _environ_get,
     /** @export */ environ_sizes_get: _environ_sizes_get,
     /** @export */ exit: _exit,
@@ -7011,6 +7080,7 @@ function stackCheckInit() {
 
 function run(args = arguments_) {
   if (runDependencies > 0) {
+    dbg("run() called, but dependencies remain, so not running");
     dependenciesFulfilled = run;
     return;
   }
@@ -7023,6 +7093,7 @@ function run(args = arguments_) {
   preRun();
   // a preRun added a dependency, run will be called later
   if (runDependencies > 0) {
+    dbg("run() called, but dependencies remain, so not running");
     dependenciesFulfilled = run;
     return;
   }

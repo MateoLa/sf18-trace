@@ -52,7 +52,7 @@ ifeq ($(multithread),yes)
 	CXXFLAGS += -pthread
 	LDFLAGS += -s MALLOC=mimalloc
 	LDFLAGS += -s USE_PTHREADS=1 -s SHARED_MEMORY=1 -s PROXY_TO_PTHREAD=1
-	LDFLAGS += -s PTHREAD_POOL_SIZE=navigator.hardwareConcurrency
+	LDFLAGS += -s PTHREAD_POOL_SIZE=navigator.hardwareConcurrency-1
 else
 	CXXFLAGS += -DSINGLE_THREAD
 endif
@@ -71,6 +71,7 @@ ifeq ($(debug),yes)
 	LDFLAGS += --emit-symbol-map
 	ifeq ($(COMP),emscripten)
 		LDFLAGS += -s SAFE_HEAP=1
+		LDFLAGS += -s PTHREADS_DEBUG=1
 		LDFLAGS += -gsource-map=inline --source-map-base http://localhost:6931/ -fsanitize=undefined
 #		LDFLAGS += -gsource-map=inline --source-map-base http://localhost:6931/ -fsanitize=undefined,address
 	endif

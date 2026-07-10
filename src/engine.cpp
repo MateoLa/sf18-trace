@@ -67,6 +67,10 @@ Engine::Engine(std::optional<std::string> path) :
              // Heap-allocate because sizeof(NN::Networks) is large
              std::make_unique<NN::Networks>(NN::EvalFile{EvalFileDefaultNameBig, "None", ""},
                                             NN::EvalFile{EvalFileDefaultNameSmall, "None", ""})) {
+std::string aux;
+if (path) { aux = *path; }
+else { aux = "NO ARGV"; }
+std::cout << "MaLa debug: " << aux << std::endl;
 
     pos.set(StartFEN, false, &states->back());
 
@@ -149,6 +153,7 @@ Engine::Engine(std::optional<std::string> path) :
 
     load_networks();
     resize_threads();
+std::cout << "MaLa debugging: threads resized" << std::endl;
 }
 
 std::uint64_t Engine::perft(const std::string& fen, Depth depth, bool isChess960) {
@@ -242,6 +247,8 @@ void Engine::set_numa_config_from_option(const std::string& o) {
 
 void Engine::resize_threads() {
     threads.wait_for_search_finished();
+std::cout << "MaLa debugging: resizing threads" << std::endl;
+
     threads.set(numaContext.get_numa_config(), {options, threads, tt, sharedHists, networks},
                 updateContext);
 

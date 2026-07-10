@@ -66,6 +66,15 @@ src/emscripten  # directory
 In "src/Makefile" we consider a new architecture and compiler: "wasm" and "emscripten".
 
 
+#### src/emscripten/Makefile
+
+* PTHREAD_POOL_SIZE
+Leave one core free for the main browser UI thread to remain smooth. <br>
+-s PTHREAD_POOL_SIZE = Math.max(1,navigator.hardwareConcurrency-1)
+
+
+
+
 ##### The uci->loop()
 
 Stockfish loop runs until token == "quit" or an EOF occurs in getline(std::cin, cmd). 
@@ -137,9 +146,9 @@ make ARCH=wasm clean
 ```
 
 
-#### Debbuging
+#### Debugging
 
-When trying to compile our own version of Stockfish WebAssembly we face many errors which we summarize [here](/docs/debbuging.md).
+When trying to compile our own version of Stockfish WebAssembly we face many errors which we summarize [here](/docs/debugging.md).
 
 Notice that if you do not override the Module["stdin"] function, the window.prompt bound to std::cin is triggered, which shows that it is used somewhere in the Stockfish project.
 
@@ -175,6 +184,8 @@ quit
 To understand Stockfish: <br>
 [Bitboards](/docs/bitboards.md)
 [Bitboards in Chess](/docs/bitboards_in_chess.md)
+[Debugging](/docs/debugging.md)
+[Threads](/docs/threads.md)
 
 
 ### Acknowledgements

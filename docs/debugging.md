@@ -145,18 +145,30 @@ When running Stockfish over WebAssembly, the main browser thrread cannot be bloc
 When a worker thread calls notify_one(), it might require a message event loop turn to propagate the signal across the SharedArrayBuffer barrier via the browsers's web workers. If the main thread is frozen waiting, it can never process the incoming notification.
 
 The Problem:
+
 Classes declared in EMSCRIPTEN_BINDINGS initialize automatically when the WebAssembly module loads. This relies on C++ static iitialization. Under the hood, Emscripten hooks this process so exported classes are exposed immediately upon the onRuntimeInitialized JS lifecycle event. <br>
 But, what's happens? <br>
 Well, the Module and the class are initialized together, but threads synchronizations fails because main() exits before synchronizations ends.
 
 Solution: <br>
+
 Add `emscripten_runtime_keepalive_push();` into main().
 
 
-### Browsing errors
+#### uci command GO - Aborted(alignment fault)
+
+In uci.cpp, when token = GO, the application must print `print_info_string(engine.numa_config_information_as_string());` <br>
+"numa_config_information_as_string()" execute `get_numa_config_as_string()` at engine.cpp which in turn calls `get_numa_config().to_string()` from a numa Context.
+In numa.h, the function `to_string()` try to loop between nodes in: `for (auto&& cpus : nodes)` and it fails because nodes is empty.
+
+Why nodes is empty? <br>
+Stockfish stands: "It is guaranteed that NUMA nodes are NOT empty: every node exposed by NumaConfig has at least one processor assigned." <br>
+
+nodes is empty because engine does not exists??
 
 
-#### Program exited
+
+#### Browser - Program exited
 
 The error reported by the browser is: <br>
 `program exited (with status: 0), but keepRuntimeAlive() is set (counter=0) due to an async operation, so halting execution`
@@ -173,7 +185,7 @@ Lesson: You can call other C/C++ functions after main() has finished, but you mu
 Lesson: To export the function use `EMSCRIPTEN_KEEPALIVE` or `-s EXPORTED_FUNCTIONS="['_function_name']"`
 
 
-#### Blocking on the main thread is very dangerous
+#### Browser - Blocking on the main thread is very dangerous
 
 To use pthreads ("multithread" option in Makefile) you should work over workers and do not build your module into the main thread. To build the module in the main thread set multithread=no in emscripten/Makefile.
 

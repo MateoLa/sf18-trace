@@ -16,20 +16,21 @@ CXXFLAGS += -flto -DUSE_POPCNT
 # Build options
 minify_js = no
 assertion = yes
-multithread = yes
+multithread = no
 wasm_simd = yes
-embedded_nnue = no
+embedded_nnue = yes
 debug = yes
 
 VPATH := $(VPATH):emscripten:../server
 
 LDFLAGS += -flto
 LDFLAGS += --pre-js emscripten/pre.js
-# LDFLAGS += --preload-file emscripten/pikafish.nnue@pikafish.nnue
+LDFLAGS += --preload-file nn-c288c895ea92.nnue@nn-c288c895ea92.nnue
+LDFLAGS += --preload-file nn-37f18f62d772.nnue@nn-37f18f62d772.nnue
 LDFLAGS += -s ENVIRONMENT="web,worker" -s MODULARIZE=1 -s EXPORT_ES6=1 -s EXPORT_NAME="Stockfish"
 LDFLAGS += -s STACK_SIZE=128KB
 LDFLAGS += -s ALLOW_MEMORY_GROWTH=1 -s INITIAL_MEMORY=256MB -s MAXIMUM_MEMORY=2GB
-LDFLAGS += -s EXPORTED_RUNTIME_METHODS="['cwrap']"
+LDFLAGS += -s FORCE_FILESYSTEM=1 -s EXPORTED_RUNTIME_METHODS="['FS', 'cwrap']"
 # LDFLAGS += -s EXPORTED_FUNCTIONS="['_uci_step', '_create_instance', '_call_add']"
 LDFLAGS += --bind
 LDFLAGS += -s EXIT_RUNTIME=0
@@ -71,7 +72,7 @@ ifeq ($(debug),yes)
 	LDFLAGS += --emit-symbol-map
 	ifeq ($(COMP),emscripten)
 		LDFLAGS += -s SAFE_HEAP=1
-		LDFLAGS += -s PTHREADS_DEBUG=1
+#		LDFLAGS += -s PTHREADS_DEBUG=1
 		LDFLAGS += -gsource-map=inline --source-map-base http://localhost:6931/ -fsanitize=undefined
 #		LDFLAGS += -gsource-map=inline --source-map-base http://localhost:6931/ -fsanitize=undefined,address
 	endif

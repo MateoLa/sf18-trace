@@ -544,6 +544,8 @@ class NumaConfig {
                                   bool respectProcessAffinity = true) {
         NumaConfig cfg = empty();
 
+std::cout << "MaLa: Numa config from System - SystemThreadsNB - " << SYSTEM_THREADS_NB << std::endl;
+
 #if !((defined(__linux__) && !defined(__ANDROID__)) || defined(_WIN64))
         // Fallback for unsupported systems.
         for (CpuIndex c = 0; c < SYSTEM_THREADS_NB; ++c)
@@ -647,6 +649,9 @@ class NumaConfig {
 
 #endif
 
+std::string aux = cfg.to_string().empty() ? "CONFIG ERROR" : cfg.to_string(); 
+std::cout << "MaLa: Into Numa config From System - TO STRING - " << aux << std::endl;
+
         // We have to ensure no empty NUMA nodes persist.
         cfg.remove_empty_numa_nodes();
 
@@ -708,6 +713,8 @@ class NumaConfig {
     std::string to_string() const {
         std::string str;
 
+std::cout << "MaLa: numa context config - TO STRING - nodes " << nodes.size() << std::endl;
+
         bool isFirstNode = true;
         for (auto&& cpus : nodes)
         {
@@ -745,6 +752,7 @@ class NumaConfig {
 
             isFirstNode = false;
         }
+std::cout << "MaLa: numa context config string - " << str << std::endl;
 
         return str;
     }

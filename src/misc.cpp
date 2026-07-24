@@ -34,6 +34,9 @@
 #include <string_view>
 
 #include "types.h"
+#ifdef __EMSCRIPTEN__
+    #include <emscripten.h>
+#endif
 
 namespace Stockfish {
 
@@ -498,6 +501,8 @@ std::string CommandLine::get_binary_directory(std::string argv0) {
 
     // Extract the working directory
     auto workingDirectory = CommandLine::get_working_directory();
+std::cout << "MaLa: workingDirectory - " << workingDirectory << std::endl;
+
 
     // Extract the binary directory path from argv0
     auto   binaryDirectory = argv0;
@@ -511,13 +516,20 @@ std::string CommandLine::get_binary_directory(std::string argv0) {
     if (binaryDirectory.find("." + pathSeparator) == 0)
         binaryDirectory.replace(0, 1, workingDirectory);
 
+std::cout << "MaLa: binaryDirectory - " << binaryDirectory << std::endl;
+
     return binaryDirectory;
 }
 
 std::string CommandLine::get_working_directory() {
     std::string workingDirectory = "";
     char        buff[40000];
+#ifdef __EMSCRIPTEN__
+    char*       cwd = (char*)EM_ASM_INT({ FS.cwd(); });
+#else
     char*       cwd = GETCWD(buff, 40000);
+#endif
+
     if (cwd)
         workingDirectory = cwd;
 

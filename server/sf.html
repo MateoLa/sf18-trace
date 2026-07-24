@@ -43,7 +43,7 @@
                     if (event.key === "Enter") {
                         add_output("input> " + command.value);
                         console.log(my.add());
-                        engine.one_frame(guess.value);
+                        uci.uci_step(command.value);
                         command.value = "";
                     }
                 });

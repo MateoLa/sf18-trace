@@ -43,7 +43,8 @@
 //     const unsigned char *const gEmbeddedNNUEEnd;     // a marker to the end
 //     const unsigned int         gEmbeddedNNUESize;    // the size of the embedded file
 // Note that this does not work in Microsoft Visual Studio.
-#if !defined(_MSC_VER) && !defined(NNUE_EMBEDDING_OFF)
+
+#if !defined(_MSC_VER) && !defined(NNUE_EMBEDDING_OFF) && !defined(__EMSCRIPTEN__)
 INCBIN(EmbeddedNNUEBig, EvalFileDefaultNameBig);
 INCBIN(EmbeddedNNUESmall, EvalFileDefaultNameSmall);
 #else
@@ -80,7 +81,6 @@ EmbeddedNNUE get_embedded(EmbeddedNNUEType type) {
 
 }
 
-
 namespace Stockfish::Eval::NNUE {
 
 
@@ -116,20 +116,27 @@ void Network<Arch, Transformer>::load(const std::string& rootDirectory, std::str
     std::vector<std::string> dirs = {"<internal>", "", rootDirectory};
 #endif
 
+std::cout << "MaLa: network LOAD. EvalFilePath: " << evalfilePath << std::endl;
+std::cout << "MaLa: network LOAD. RootDirectory: " << rootDirectory << std::endl;
     if (evalfilePath.empty())
         evalfilePath = evalFile.defaultName;
 
     for (const auto& directory : dirs)
     {
+std::cout << "MaLa: network LOAD. EvalFileCurrent: " << std::string(evalFile.current) << std::endl;
+std::cout << "MaLa: network LOAD. Directory: " << directory << std::endl;
+
         if (std::string(evalFile.current) != evalfilePath)
         {
             if (directory != "<internal>")
             {
+std::cout << "MaLa: network LOAD USER NET." << std::endl;
                 load_user_net(directory, evalfilePath);
             }
 
             if (directory == "<internal>" && evalfilePath == std::string(evalFile.defaultName))
             {
+std::cout << "MaLa: network LOAD INTERNAL: " << std::string(evalFile.defaultName) << std::endl;
                 load_internal();
             }
         }
@@ -194,9 +201,13 @@ void Network<Arch, Transformer>::verify(std::string                             
                                         const std::function<void(std::string_view)>& f) const {
     if (evalfilePath.empty())
         evalfilePath = evalFile.defaultName;
+std::cout << "MaLa: into Network. VERIFY - evalfilePath: " << evalfilePath << std::endl;
+std::cout << "MaLa: into Network. VERIFY - evalfileCurrent: " << std::string(evalFile.current) << std::endl;
 
     if (std::string(evalFile.current) != evalfilePath)
     {
+std::cout << "MaLa: into Network. Verifying NET - I'm an if." << std::endl;
+
         if (f)
         {
             std::string msg1 =
@@ -220,13 +231,20 @@ void Network<Arch, Transformer>::verify(std::string                             
 
     if (f)
     {
+std::cout << "MaLa: into Network. Verifying NET - I'm the 2nd if." << std::endl;
+std::string mala = "MaLa";
+f(mala);
+
         size_t size = sizeof(featureTransformer) + sizeof(Arch) * LayerStacks;
         f("NNUE evaluation using " + evalfilePath + " (" + std::to_string(size / (1024 * 1024))
           + "MiB, (" + std::to_string(featureTransformer.TotalInputDimensions) + ", "
           + std::to_string(network[0].TransformedFeatureDimensions) + ", "
           + std::to_string(network[0].FC_0_OUTPUTS) + ", " + std::to_string(network[0].FC_1_OUTPUTS)
           + ", 1))");
+    } else {
+std::cout << "MaLa: into Network. VERIFYING - There's NO FUNCTION" << std::endl;
     }
+
 }
 
 
@@ -267,6 +285,7 @@ void Network<Arch, Transformer>::load_user_net(const std::string& dir,
 
     if (description.has_value())
     {
+std::cout << "MaLa: LOAD User Description: " << description.value_or("No Description") << std::endl;
         evalFile.current        = evalfilePath;
         evalFile.netDescription = description.value();
     }
@@ -284,7 +303,13 @@ void Network<Arch, Transformer>::load_internal() {
         }
     };
 
+std::cout << "MaLa: FileNameBig: " << EvalFileDefaultNameBig << std::endl;
+std::cout << "MaLa: FileNameSmall: " << EvalFileDefaultNameSmall << std::endl;
     const auto embedded = get_embedded(embeddedType);
+std::string aux = embeddedType == EmbeddedNNUEType::BIG ? "BIG" : "SMALL";
+std::cout << "MaLa: EMBEDDED " << aux << " - Size: " << int(embedded.size) << std::endl;
+std::cout << "MaLa: EMBEDDED " << aux << " - Data: " << reinterpret_cast<const char*>(embedded.data) << std::endl;
+std::cout << "MaLa: EMBEDDED " << aux << " - End: " << reinterpret_cast<const char*>(&embedded.end) << std::endl;
 
     MemoryBuffer buffer(const_cast<char*>(reinterpret_cast<const char*>(embedded.data)),
                         size_t(embedded.size));
@@ -294,6 +319,7 @@ void Network<Arch, Transformer>::load_internal() {
 
     if (description.has_value())
     {
+std::cout << "MaLa: LOAD Internal Description: " << description.value_or("No Description") << std::endl;
         evalFile.current        = evalFile.defaultName;
         evalFile.netDescription = description.value();
     }

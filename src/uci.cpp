@@ -53,6 +53,8 @@ template<typename... Ts>
 overload(Ts...) -> overload<Ts...>;
 
 void UCIEngine::print_info_string(std::string_view str) {
+std::cout << "MaLa: Engine. Trying to Verify Networks: " << str << std::endl;
+
     sync_cout_start();
     for (auto& line : split(str, "\n"))
     {
@@ -88,9 +90,8 @@ void UCIEngine::init_search_update_listeners() {
 void UCIEngine::loop() {
     std::string token, cmd;
 
-    for (int i = 1; i < cli.argc; ++i) {
+    for (int i = 1; i < cli.argc; ++i)
         cmd += std::string(cli.argv[i]) + " ";
-    }
 
 std::cout << "MaLa debugging: the command stream is: " + cmd << std::endl;
 
@@ -116,20 +117,10 @@ void UCIEngine::uci_step(std::string token) {
     std::istringstream is(token);
 
 std::cout << "MaLa debugging: One Step Token: " + token << std::endl;
-/*
-#ifdef __EMSCRIPTEN__
-    if (std::cin.fail() && !std::cin.eof()) {
-        std::cerr << "error " << strerror(errno) << "\n";
-        exit(EXIT_FAILURE);
-    };
+engine.verify_networks();
+std::cout << "MaLa debugging: one step ENGINE: " << engine.visualize() << std::endl;
 
-    if (std::cin.eof()) {
-        std::cin.clear();
-        std::clearerr(stdin);
-        std::cout << "MaLa debugging: Input EOF." << std::endl;
-    }
-#endif
-*/
+
     if (token == "quit" || token == "stop")
         engine.stop();
 
@@ -154,6 +145,7 @@ std::cout << "MaLa debugging: One Step Token: " + token << std::endl;
     {
         // send info strings after the go command is sent for old GUIs and python-chess
         print_info_string(engine.numa_config_information_as_string());
+std::cout << "MaLa: Into the GO command" << std::endl;
         print_info_string(engine.thread_allocation_information_as_string());
         go(is);
     }
@@ -202,7 +194,6 @@ std::cout << "MaLa debugging: One Step Token: " + token << std::endl;
     else if (!token.empty() && token[0] != '#')
         sync_cout << "Unknown command: '" << token << "'. Type help for more information." << sync_endl;
 }
-
 
 Search::LimitsType UCIEngine::parse_limits(std::istream& is) {
     Search::LimitsType limits;

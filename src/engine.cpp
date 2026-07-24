@@ -70,9 +70,10 @@ Engine::Engine(std::optional<std::string> path) :
 std::string aux;
 if (path) { aux = *path; }
 else { aux = "NO ARGV"; }
-std::cout << "MaLa debug: " << aux << std::endl;
+std::cout << "MaLa debug: into Engine - PATH " << aux << std::endl;
 
     pos.set(StartFEN, false, &states->back());
+std::cout << "MaLa: position " << pos.fen() << std::endl;
 
     options.add(  //
       "Debug Log File", Option("", [](const Option& o) {
@@ -141,7 +142,9 @@ std::cout << "MaLa debug: " << aux << std::endl;
 
     options.add(  //
       "EvalFile", Option(EvalFileDefaultNameBig, [this](const Option& o) {
+std::cout << "MaLa: EvalFile big Option ADDED" << std::endl;
           load_big_network(o);
+std::cout << "MaLa: EvalFile big Option ADDED" << std::endl;
           return std::nullopt;
       }));
 
@@ -153,7 +156,8 @@ std::cout << "MaLa debug: " << aux << std::endl;
 
     load_networks();
     resize_threads();
-std::cout << "MaLa debugging: threads resized" << std::endl;
+std::cout << "MaLa debugging: Threads Resized" << std::endl;
+std::cout << "MaLa: Options " << options << std::endl;
 }
 
 std::uint64_t Engine::perft(const std::string& fen, Depth depth, bool isChess960) {
@@ -164,6 +168,7 @@ std::uint64_t Engine::perft(const std::string& fen, Depth depth, bool isChess960
 
 void Engine::go(Search::LimitsType& limits) {
     assert(limits.perft == 0);
+std::cout << "MaLa: I'm GOing" << std::endl;
     verify_networks();
 
     threads.start_thinking(options, pos, states, limits);
@@ -267,8 +272,13 @@ void Engine::set_ponderhit(bool b) { threads.main_manager()->ponder = b; }
 // network related
 
 void Engine::verify_networks() const {
+std::cout << "MaLa: into Engine. VERIFY NETWORKS" << std::endl;
+std::cout << "Mala: NUMA CONFIG: " << get_numa_config_as_string() << std::endl;
+
     networks->big.verify(options["EvalFile"], onVerifyNetworks);
     networks->small.verify(options["EvalFileSmall"], onVerifyNetworks);
+std::string mala = "MaLa";
+
 
     auto statuses = networks.get_status_and_errors();
     for (size_t i = 0; i < statuses.size(); ++i)
@@ -296,7 +306,7 @@ void Engine::verify_networks() const {
         {
             message += " " + *error;
         }
-
+std::cout << "MaLa: engine. Messages Loop: " << message << std::endl;
         onVerifyNetworks(message);
     }
 }
@@ -306,6 +316,9 @@ void Engine::load_networks() {
         networks_.big.load(binaryDirectory, options["EvalFile"]);
         networks_.small.load(binaryDirectory, options["EvalFileSmall"]);
     });
+
+std::cout << "MaLa: into Engine. Loading_Networks." << std::endl;
+
     threads.clear();
     threads.ensure_network_replicated();
 }

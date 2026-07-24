@@ -21,7 +21,7 @@ wasm_simd = yes
 embedded_nnue = yes
 debug = yes
 
-VPATH := $(VPATH):emscripten:../server
+VPATH += :emscripten:../server
 
 LDFLAGS += -flto
 LDFLAGS += --pre-js emscripten/pre.js
@@ -83,7 +83,7 @@ EM_EMSCRIPTEN = $(shell emsdk list | grep INSTALLED | head -n 1 | awk '{ print $
 
 EXTRACXXFLAGS += -DEM_EMSCRIPTEN=$(EM_EMSCRIPTEN)
 
-EM_ARTIFACTS += ../server/sf18.js ../server/sf18.wasm ../server/sf18.js.symbols ../server/sf18.wasm.map
+EM_ARTIFACTS += ../server/sf18.js ../server/sf18.wasm ../server/sf18.js.symbols ../server/sf18.wasm.map ../server/sf18.data
 
 # ToDo --> You need to bench a js file from console. May be calling node?
 wasm-profile:

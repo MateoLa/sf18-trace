@@ -54,7 +54,8 @@ Thread::Thread(Search::SharedState&                    sharedState,
     nthreads(sharedState.options["Threads"]),
     stdThread(&Thread::idle_loop, this) {
 
-std::cout << "MaLa debug: Into the Thread" << std::endl;
+std::cout << "MaLa new THREAD" << std::endl;
+std::cout << "(Parked in idle_loop by a startup routine right after the thread launches and until work is assigned)" << std::endl;
 std::cout << "MaLa debug: Theads - " << sharedState.options["Threads"] << std::endl;
 std::cout << "MaLa debug: numaN - " << numaN << std::endl;
 std::cout << "MaLa debug: Total Numa Count - " << totalNumaCount << std::endl;
@@ -102,11 +103,14 @@ void Thread::clear_worker() {
 
 // Blocks on the condition variable until the thread has finished searching
 void Thread::wait_for_search_finished() {
-std::cout << "MaLa debug: waiting for search finished" << std::endl;
-std::cout << "MaLa debug: searching boolean - " << searching << std::endl;
+std::cout << "MaLa WAITING for search finished" << std::endl;
+std::cout << "MaLa: searching boolean - " << searching << std::endl;
+std::cout << "MaLa: searching must change to 0" << std::endl;
+std::cout << "MaLa: going to Thread::idle_loop called at thread startup" << std::endl;
+
     std::unique_lock<std::mutex> lk(mutex);
     cv.wait(lk, [&] { return !searching; });
-std::cout << "Now Worker thread is processing data..." << std::endl;
+std::cout << "MaLa THREAD ALIVE, now processing data." << std::endl;
 }
 
 // Launching a function in the thread
@@ -129,7 +133,7 @@ void Thread::ensure_network_replicated() { worker->ensure_network_replicated(); 
 void Thread::idle_loop() {
     while (true)
     {
-std::cout << "MaLa: I'm parked. I have no work to do" << std::endl;
+std::cout << "MaLa: idle loop. PARQUED - No work to do" << std::endl;
         std::unique_lock<std::mutex> lk(mutex);
         searching = false;
         cv.notify_one();  // Wake up anyone waiting for search finished

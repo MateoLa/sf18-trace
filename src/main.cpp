@@ -25,95 +25,27 @@
 #include "tune.h"
 #include "uci.h"
 
-#ifdef __EMSCRIPTEN__
-    #include <emscripten.h>
-    #include <emscripten/bind.h>
-    #include <emscripten/threading.h>
-#endif
 
 using namespace Stockfish;
 
 
-// Test if myClass already exists after main() exits.
-struct myClass {
-    std::string message = "MaLa engine runing.";
-    float xpos = 0;
-
-    float add(){
-        return xpos += 1;
-    }
-};
-
-/*
-extern "C" {
-    EMSCRIPTEN_KEEPALIVE
-    MyClass* create_instance() {
-        return new MyClass();
-    }
-    
-    EMSCRIPTEN_KEEPALIVE
-    float call_add(MyClass* instance) {
-        return instance->add();
-    }
-}
-*/
-
-
-struct ARGS
-{
-    int argc;
-    std::vector<std::string> argv;
-} args;
-
 #ifdef __EMSCRIPTEN__
-// UCIEngine class wrapper
-class wasmUCI {
-private:
-    UCIEngine* uci;
-
-public:
-    wasmUCI() {
-        Bitboards::init();
-        Position::init();
-std::cout << "MaLa debug: Init done" << std::endl;
-
-        char** argv = new char*[args.argc];
-        for (int i = 0; i < args.argc; ++i) { argv[i] = args.argv[i].data(); }
-        argv[args.argc] = nullptr; // Explicitly null-terminate the array
-
-        auto uci = std::make_unique<UCIEngine>(args.argc, argv);
-
-        Tune::init(uci->engine_options());
-
-std::cout << "MaLa: main browser thread? " << emscripten_is_main_browser_thread() << std::endl;
-std::cout << "MaLa: thread running main? " << emscripten_is_main_runtime_thread() << std::endl;
-    }
-
-    ~wasmUCI() { delete uci; }
-
-    void uci_step(std::string token) { uci->uci_step(token); }
-};
+UCIEngine* uciP;
 #endif
 
 
 int main(int argc, char* argv[]) {
     std::cout << engine_info() << std::endl;
 
-args.argc = argc;
-for (int i = 0; i < argc; ++i) { args.argv.emplace_back(argv[i]); }
-
-for (const auto& str: args.argv) { std::cout << str << std::endl; }
-
-#ifdef __EMSCRIPTEN__
-    std::cout << "MaLa: main browser thread? " << emscripten_is_main_browser_thread() << std::endl;
-    std::cout << "MaLa: thread running main? " << emscripten_is_main_runtime_thread() << std::endl;
-
-    emscripten_runtime_keepalive_push();
-#else
     Bitboards::init();
     Position::init();
 std::cout << "MaLa debug: Init done" << std::endl;
 
+#ifdef __EMSCRIPTEN__
+    uciP = new UCIEngine(argc, argv);
+
+    Tune::init(uciP->engine_options());
+#else
     auto uci = std::make_unique<UCIEngine>(argc, argv);
 
     Tune::init(uci->engine_options());
@@ -121,27 +53,14 @@ std::cout << "MaLa debug: Init done" << std::endl;
     uci->loop();
 #endif
 
-std::cout << "MaLa debug: main exit" << std::endl;
-
+std::cout << "MaLa: EXITING MAIN()" << std::endl;
     return 0;
 }
 
 
 #ifdef __EMSCRIPTEN__
-EMSCRIPTEN_BINDINGS(sf) {
-    emscripten::class_<wasmUCI>("wasmUCI")
-	.constructor<>()
-        .function("uci_step", &wasmUCI::uci_step);
-
-
-//    emscripten::function("wasm_uci", &wasm_uci, emscripten::allow_raw_pointers());
-//    emscripten::function("wasm_step", &wasm_step, emscripten::allow_raw_pointers());
-
-    emscripten::class_<myClass>("myClass")
-	.constructor<>()
-        .property("xpos", &myClass::xpos)
-        .property("message", &myClass::message)
-        .function("add", &myClass::add);
+extern "C" void wasm_uci(std::string cmd) {
+    uciP->uci_command(cmd);
 }
 #endif
 

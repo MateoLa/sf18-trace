@@ -106,18 +106,20 @@ std::cout << "MaLa debugging: the command stream is: " + cmd << std::endl;
         token.clear();  // Avoid a stale if getline() returns nothing or a blank line
         is >> std::skipws >> token;
 
-std::cout << "MaLa debugging: Into the loop. Arg Counter: " + std::to_string(cli.argc) << std::endl;
-std::cout << "MaLa debugging: Into the loop. Command: " + cmd << std::endl;
-
-        uci_step(token);
+std::cout << "MaLa LOOP Command: " << cmd << std::endl;
+        uci_command(cmd);
     } while (token != "quit" && cli.argc == 1);  // The command-line arguments are one-shot
 }
 
-void UCIEngine::uci_step(std::string token) {
-    std::istringstream is(token);
+void UCIEngine::uci_command(std::string cmd) {
+    std::string token;
+    std::istringstream is(cmd);
 
-std::cout << "MaLa debugging: One Step Token: " + token << std::endl;
-engine.verify_networks();
+    token.clear();  // Avoid a stale if getline() returns nothing or a blank line
+    is >> std::skipws >> token;
+
+std::cout << "MaLa ONE STEP Token: " << token << std::endl;
+// engine.verify_networks();
 std::cout << "MaLa debugging: one step ENGINE: " << engine.visualize() << std::endl;
 
 

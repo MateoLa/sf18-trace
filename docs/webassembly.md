@@ -41,7 +41,7 @@ Alternatively, you can produce a factory module, which allows you to produce mul
 * If your output file extension is .js and not .mjs, then you have to add the -sEXPORT_ES6 setting to output a JavaScript module.
 
 ```sh
-emcc -o hello.mjs hello.c -O3 -sMODULARIZE -sEXPORT_ES6
+emcc -o hello.mjs hello.c -O3 -s MODULARIZE=1 -s EXPORT_ES6=1
 ```
 
 Then in your code import the factory and call it:
@@ -53,6 +53,11 @@ createModule().then((Module) => {
   console.log("Wasm ready", Module);
 });
 ```
+
+The `-s EXPORT_ES6=1` flag makes the compiler to include a "default" export in the compiled JS, so you can use `import "somename" from "path-to-js"`
+
+The `-sEXPORT_NAME="Pepito"` has sence only if you compile the application as an ES6 module.
+
 
 ### Calling a custom function defined in C
 

@@ -1,25 +1,19 @@
 import xx from "./sf18.js"
 
-let memory = new WebAssembly.Memory({ initial: 256, maximum: 512});
-
-let engine;
-let uci, my = null;
-
+let memory = new WebAssembly.Memory({ initial: 256, maximum: 1024});
 
 let Module = {
     memory: memory,
     print: (text) => { self.postMessage(text) },
     printErr: (err) => { console.warn("MaLa C++ error: ", err); },
-    onRuntimeInitialized: function() { console.log('Module loaded: ', Module); }
+    onRuntimeInitialized: () => { console.log('Module loaded: ', Module); },
 };
 
-// Initialize the module with your options xx(options)
-xx(Module).then((instance) => { 
-    console.log("Module fully loaded");
-    my = new instance.myClass;
-    uci = new instance.wasmUCI();
-    console.log(uci);
-    engine = instance 
-});
+const sf = await xx(Module);
+let wasm_uci = sf.cwrap('wasm_uci', null, ['string']);
 
-self.onmessage = (e) => { engine.one_frame(e.data); }
+
+self.onmessage = (e) => {
+    console.log("MaLa WORKER - cmd: ", e.data);
+    wasm_uci(e.data);
+}

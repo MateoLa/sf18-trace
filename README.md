@@ -1,6 +1,6 @@
 <div align="center">
 
-<img src=/assets/stockfish_128x128.png></img>
+<img src=/assets/stockfish_128x128.png width="128"></img>
 
 <h3>Stockfish Wasm</h3>
 
@@ -46,13 +46,9 @@ Wasm is a binary instruction format for a stack-based virtual machine. The code 
 WebAssembly is designed to complement and run alongside JavaScript, sharing functionality between them.
 
 
-#### Stockfish Source Code Modifications
+### Stockfish Source Code Modifications
 
 Stockfish is written in C++ to maximize speed execution. The code has been optimized for certain HW architectures but compilation for web browsers has not been taken into account. We barely modified the source code to achieve this.
-
-Broadly speaking, Stockfish is state machine that holds its state in a UCI::Engine class. It returns a chess position evaluation after each game movement. In C++ it runs in a `uci->loop()` function waiting for the user input which is readed througth the `std::cin` console or the `getline(std::cin, cmd)` library. In browsers, we can initialize the engine and execute one loop step for each movement.
-
-In WebAssembly, both the loop and the I/O method blocks the main browser thread. Let's modify them.
 
 Added or modified files:
 ```sh
@@ -66,9 +62,14 @@ src/emscripten  # directory
 
 In "src/Makefile" we consider a new architecture and compiler: "wasm" and "emscripten".
 
-In browsers, we can avoid the loop and execute one loop step for each movement or uci command. <br>
-In main.cpp, the uci->loop():
 
+#### The UCI->loop()
+
+Broadly speaking, Stockfish is state machine that holds its state in a UCI::Engine class. It returns a chess position evaluation after each game movement. In C++ it runs in a `uci->loop()` function waiting for the user input that is readed througth the `std::cin` console or the `getline(std::cin, cmd)` library. 
+
+In WebAssembly, both the loop and the I/O method blocks the main browser thread.
+
+In main.cpp, the uci->loop():
 ```C++
     do
     {
@@ -77,21 +78,39 @@ In main.cpp, the uci->loop():
     } while (token != "quit" && cli.argc == 1);  // The command-line arguments are one-shot
 ```
 
-We avoid the "getline(std::cin, cmd)" usage and creates a `uci_step()` function that can be called form JS.
+We create the `uci_step()` function to be called form JS avoinding the loop and the I/O method "getline(std::cin, cmd)".
 
 
-##### The UCIEngine class
+#### The UCIEngine class
 
-We need to export the UCIEngine class to JS. <br>
-The argument `char* argv[]` (or char** argv) is a pointer to a pointer which is difficult to bind to JS.
+We need to export the UCIEngine class to JS.
 
-With wasmUCI() we try to wrapp the UCIEngine class mapping the double pointer argument to an array. <br>
-This modification is very delicate and must be done with care because the engine can fail.
+```C++
+UCIEngine::UCIEngine(int argc, char** argv) :
+    engine(argv[0]),
+    cli(argc, argv) {
 
-The "char* argv[]" is used to define a CommandLine class that implement the `get_binary_directory()` function which is used to load the nnue networks (from the argv[0] = "path"), that is `binaryDirectory = argv0`.
+    engine.get_options().add_info_listener([](const std::optional<std::string>& str) {
+        if (str.has_value())
+            print_info_string(*str);
+    });
 
-In WebAssembly path = `./this.programm` while in C++ path = `./stockfish`. <br>
-Values loaded when running main() without arguments.
+    init_search_update_listeners();
+}
+```
+
+The argument `char* argv[]` (or char** argv) is a pointer to a pointer (double pointer) and Emscripten does not have a direct built-in type mapping for it. We can try refactoring the class to accept a `const std::vector<std::string>` instead of the double pointer, but it's much easier to refactor the class so it doesn't take arguments.
+
+`cli(argc, argv)` is an instance of `CommandLine` which is used to get the loop I/O commands `cmd += std::string(cli.argv[i])` but we going to use our `uci_step(token)` function directly from JS, so we don't need "cli".
+
+```C++
+Engine::Engine(std::optional<std::string> path) :
+    binaryDirectory(path ? CommandLine::get_binary_directory(*path) : ""),
+```
+
+In the engine, the argument `argv[0] = path` is optional, and it is used to "get the binary directory" `binaryDirectory = argv0` to load the nnue networks.
+
+When you call main() with no arguments, argv[0] is auto-generated. Emscripten automatically inserts a dummy program name (usually ./this.program) as the first element. In WebAssembly path = `./this.programm` while in C++ path = `./stockfish`.
 
 In C++ workingDirectory = ~/path_to_your_stockfish/src <br>
 In C++ binaryDirectory = ~/path_to_your_stockfish/src/
@@ -100,6 +119,8 @@ In wasm workingDirectory = / <br>
 In wasm binaryDirectory = // 
 
 This is because `CommandLine::get_working_directory()` is based on `getcwd`. In WebAssembly traditional filesystem paths are generally unsupported. By default, there is no root directory and the sandbox relies on simulated in-memory filesystems.
+
+In WebAssembly, files that you want to access should be preloaded or embedded into the virtual file system. Preloading generates a virual file system that corresponds to the file system structure at compile time, relative to the current directory.
 
 2 solutions can be applied: <br>
     * Mount a filesystem - initialize a filesystem backend like IndexedDB or NodeFS or pre-polulate memory using `--preload-file` <br>
@@ -116,6 +137,19 @@ LDFLAGS += --preload-file nn-37f18f62d772.nnue@nn-37f18f62d772.nnue
 ```
 
 In Makefile, the `--preload-file` flag package the files during compilation so they are available in the virtual cwd of the browser (static packaging). The C++ code can then immediately access the file at the path given in the flag using standard C file APIs.
+
+
+#### Pthreads
+
+Stockfish 18 runs in a multithread environment. <br>
+By default it runs in one thread and you can optionally config more by the setoption uci command.
+
+```sh
+./stockfish 
+setoption name Treads value 4
+```
+
+When using Emscripten's `-s MODULARIZE=1` the generated factory function does not execute main() automatically. 
 
 
 #### Prerequisites

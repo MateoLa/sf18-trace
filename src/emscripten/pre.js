@@ -1,12 +1,12 @@
 /*
-if (!Module["preRun"]) Module["preRun"] = [];
+let memory = new WebAssembly.Memory({ initial: 512, maximum: 1024});
+Module["memory"] = memory;
 
-Module["preRun"].push(function () { 
-    let wasm_uci_execute = Module.cwrap("wasm_uci_execute", "void", []);
-    Module.uci = Module.cwrap("uci_step", 'void', ['number', 'str']);
-    Module.add = Module.cwrap('call_add', 'number', ['number']);
-});
+Module["print"] = (text) => { self.postMessage(text) };
+
+Module["printErr"] = (err) => { console.error("MaLa C++ error: ", err); };
+
+Module["onRuntimeInitialized"] = () => { console.log('Module loaded: ', Module); }
 */
-
 
 Module["terminate"] = () => { PThread.terminateAllThreads(); };

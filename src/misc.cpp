@@ -524,11 +524,11 @@ std::cout << "MaLa: binaryDirectory - " << binaryDirectory << std::endl;
 std::string CommandLine::get_working_directory() {
     std::string workingDirectory = "";
     char        buff[40000];
-#ifdef __EMSCRIPTEN__
-    char*       cwd = (char*)EM_ASM_INT({ FS.cwd(); });
-#else
+//#ifdef __EMSCRIPTEN__
+//    char*       cwd = (char*)EM_ASM_INT({ FS.cwd(); });
+//#else
     char*       cwd = GETCWD(buff, 40000);
-#endif
+//#endif
 
     if (cwd)
         workingDirectory = cwd;

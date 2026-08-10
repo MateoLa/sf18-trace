@@ -1031,7 +1031,9 @@ clean: objclean profileclean
 
 # clean binaries and objects
 objclean:
-	@rm -f stockfish stockfish.exe *.o ./syzygy/*.o ./nnue/*.o ./nnue/features/*.o
+#	@rm -f stockfish stockfish.exe *.o ./syzygy/*.o ./nnue/*.o ./nnue/features/*.o
+	@rm -f *.o ./syzygy/*.o ./nnue/*.o ./nnue/features/*.o
+
 
 # clean auxiliary profiling files
 profileclean:

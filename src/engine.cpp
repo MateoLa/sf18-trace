@@ -260,6 +260,7 @@ std::cout << "MaLa debugging: resizing threads" << std::endl;
     // Reallocate the hash with the new threadpool size
     set_tt_size(options["Hash"]);
     threads.ensure_network_replicated();
+std::cout << "MaLa debug: threads RESIZED" << std::endl;
 }
 
 void Engine::set_tt_size(size_t mb) {

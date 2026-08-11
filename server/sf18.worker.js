@@ -6,14 +6,15 @@ let Module = {
     memory: memory,
     print: (text) => { self.postMessage(text) },
     printErr: (err) => { console.warn("MaLa C++ error: ", err); },
-    onRuntimeInitialized: () => { console.log('Module loaded: ', Module); },
+    onRuntimeInitialized: () => { 
+        console.log('Module loaded: ', Module);
+        Module.wasm_uci = Module.cwrap('wasm_uci', null, ['string']);
+    },
 };
 
 const sf = await xx(Module);
-let wasm_uci = sf.cwrap('wasm_uci', null, ['string']);
-
 
 self.onmessage = (e) => {
     console.log("MaLa WORKER - cmd: ", e.data);
-    wasm_uci(e.data);
+    sf.wasm_uci(e.data);
 }

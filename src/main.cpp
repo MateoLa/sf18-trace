@@ -59,7 +59,8 @@ std::cout << "MaLa: EXITING MAIN()" << std::endl;
 
 
 #ifdef __EMSCRIPTEN__
-extern "C" void wasm_uci(std::string cmd) {
+extern "C" void wasm_uci(char* str) {
+    std::string cmd(str);
     uciP->uci_command(cmd);
 }
 #endif

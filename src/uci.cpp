@@ -93,8 +93,6 @@ void UCIEngine::loop() {
     for (int i = 1; i < cli.argc; ++i)
         cmd += std::string(cli.argv[i]) + " ";
 
-std::cout << "MaLa debugging: the command stream is: " + cmd << std::endl;
-
     do
     {
         if (cli.argc == 1
@@ -118,9 +116,9 @@ void UCIEngine::uci_command(std::string cmd) {
     token.clear();  // Avoid a stale if getline() returns nothing or a blank line
     is >> std::skipws >> token;
 
+std::cout << "MaLa ONE STEP Command: " << cmd << std::endl;
 std::cout << "MaLa ONE STEP Token: " << token << std::endl;
-// engine.verify_networks();
-std::cout << "MaLa debugging: one step ENGINE: " << engine.visualize() << std::endl;
+std::cout << "MaLa One Step ENGINE visualize: " << engine.visualize() << std::endl;
 
 
     if (token == "quit" || token == "stop")

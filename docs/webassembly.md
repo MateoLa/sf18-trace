@@ -116,6 +116,20 @@ document.getElementById("my-button").addEventListener("click", () => {
 ```
 This illustrates how ccall() is used to call the exported function.
 
+
+#### Keep Runtime Alive
+
+`emscripten_exit_with_live_runtime()` Call this at the end of main() if you want to exit the main function cleanly without killing the underlying webassembly lifecycle. This implicitly handles the keepalive push.
+
+`emscripten_runtime_keepalive_push()` call in main() to increment the internal reference refcount and keep the runtime alive for async operantions or loops.
+
+`emscripten_runtime_keepalive_pop()` decrements one count from the active keepalive reference stack.
+
+
+#### Numa
+
+WebAssembly and Emscripten do not support NUMA (Non-Uniform Memory Access) architectures or multiple distinct physical memory nodes, as WebAssembly operates on a single, uniform, sandboxed linear memory space.
+
 ### Note
 
 Extracted from https://developer.mozilla.org/en-US/docs/WebAssembly/Guides/C_to_Wasm

@@ -56,14 +56,13 @@ Thread::Thread(Search::SharedState&                    sharedState,
 
 std::cout << "MaLa new THREAD" << std::endl;
 std::cout << "(Parked in idle_loop by a startup routine right after the thread launches and until work is assigned)" << std::endl;
-std::cout << "MaLa debug: Theads - " << sharedState.options["Threads"] << std::endl;
 std::cout << "MaLa debug: numaN - " << numaN << std::endl;
 std::cout << "MaLa debug: Total Numa Count - " << totalNumaCount << std::endl;
 std::cout << "MaLa debug: exit state: " << exit << std::endl;
 
     wait_for_search_finished();
 
-std::cout << "MaLa debug: before job" << std::endl;
+std::cout << "MaLa: before job" << std::endl;
     run_custom_job([this, &binder, &sharedState, &sm, n]() {
         // Use the binder to [maybe] bind the threads to a NUMA node before doing
         // the Worker allocation. Ideally we would also allocate the SearchManager
@@ -72,7 +71,7 @@ std::cout << "MaLa debug: before job" << std::endl;
         this->worker          = make_unique_large_page<Search::Worker>(
           sharedState, std::move(sm), n, idxInNuma, totalNuma, this->numaAccessToken);
     });
-std::cout << "MaLa debug: job done" << std::endl;
+std::cout << "MaLa: NUMA job done" << std::endl;
 
     wait_for_search_finished();
 }
@@ -103,25 +102,24 @@ void Thread::clear_worker() {
 
 // Blocks on the condition variable until the thread has finished searching
 void Thread::wait_for_search_finished() {
-std::cout << "MaLa WAITING for search finished" << std::endl;
-std::cout << "MaLa: searching boolean - " << searching << std::endl;
-std::cout << "MaLa: searching must change to 0" << std::endl;
-std::cout << "MaLa: going to Thread::idle_loop called at thread startup" << std::endl;
-
+std::cout << "MaLa WAITING for SEARCH - Lock" << std::endl;
     std::unique_lock<std::mutex> lk(mutex);
+std::cout << "MaLa: THREAD - Block until signal (searching is 0?) - " << searching << std::endl;
     cv.wait(lk, [&] { return !searching; });
-std::cout << "MaLa THREAD ALIVE, now processing data." << std::endl;
+std::cout << "MaLa THREAD Ends Searching." << std::endl;
 }
 
 // Launching a function in the thread
 void Thread::run_custom_job(std::function<void()> f) {
-std::cout << "MaLa: Who call me?" << std::endl;
     {
         std::unique_lock<std::mutex> lk(mutex);
+std::cout << "MaLa: THREAD - JOB Block until signal (searching is 0?) - " << searching << std::endl;
         cv.wait(lk, [&] { return !searching; });
+std::cout << "MaLa: THREAD - JOB Safely Loading." << std::endl;
         jobFunc   = std::move(f);
         searching = true;
     }
+std::cout << "MaLa: THREAD - JOB Awaikening To Run (searching is 0?) - " << searching << std::endl;
     cv.notify_one();
 }
 
@@ -133,24 +131,24 @@ void Thread::ensure_network_replicated() { worker->ensure_network_replicated(); 
 void Thread::idle_loop() {
     while (true)
     {
-std::cout << "MaLa: idle loop. PARQUED - No work to do" << std::endl;
+std::cout << "MaLa: IDLE LOOP." << std::endl;
         std::unique_lock<std::mutex> lk(mutex);
         searching = false;
         cv.notify_one();  // Wake up anyone waiting for search finished
         cv.wait(lk, [&] { return searching; });
 
-std::cout << "MaLa: In the idle loop I could exit - " << exit << std::endl;
         if (exit)
             return;
 
-std::cout << "MaLa: In idle loop I'm going to run the JOB" << std::endl;
         std::function<void()> job = std::move(jobFunc);
         jobFunc                   = nullptr;
 
         lk.unlock();
 
-        if (job)
+        if (job) {
+std::cout << "MaLa: IDLE LOOP - JOB RUNNING." << std::endl;
             job();
+        }
     }
 }
 
@@ -247,16 +245,14 @@ std::cout << "MaLa debugging: requested - " << requested << std::endl;
                 auto binder = doBindThreads ? OptionalThreadToNumaNodeBinder(numaConfig, numaId)
                                                        : OptionalThreadToNumaNodeBinder(numaId);
 
-std::cout << "MaLa debugging: treads nr - " << threads.size() << std::endl;
-std::cout << "MaLa debugging: manager - " << manager.get() << std::endl;
-std::cout << "MaLa debugging: thread Id - " << threadId << std::endl;
-std::cout << "MaLa debugging: counts - " << counts[numaId] << std::endl;
-std::cout << "MaLa debugging: threads per node - " << threadsPerNode[numaId] << std::endl;
+std::cout << "MaLa threads Set - size: " << threads.size() << std::endl;
+std::cout << "MaLa threads Set - manager: " << manager.get() << std::endl;
+std::cout << "MaLa threads Set - thread Id: " << threadId << std::endl;
+std::cout << "MaLa threads Set - Numas: " << counts[numaId] << std::endl;
 
                 threads.emplace_back(std::make_unique<Thread>(sharedState, std::move(manager),
                                                                          threadId, counts[numaId]++,
                                                                          threadsPerNode[numaId], binder));
-std::cout << "MaLa debugging: treads nr - " << threads.size() << std::endl;
             };
 
             // Ensure the worker thread inherits the intended NUMA affinity at creation.
@@ -313,7 +309,7 @@ void ThreadPool::start_thinking(const OptionsMap&  options,
                                 Position&          pos,
                                 StateListPtr&      states,
                                 Search::LimitsType limits) {
-std::cout << "MaLa: I'm in the threads pool starting thinking." << std::endl;
+std::cout << "MaLa THREAD POOL - Start Thinking." << std::endl;
  
     main_thread()->wait_for_search_finished();
 
@@ -346,6 +342,8 @@ std::cout << "MaLa: I'm in the threads pool starting thinking." << std::endl;
     if (states.get())
         setupStates = std::move(states);  // Ownership transfer, states is now empty
 
+std::cout << "MaLa THREAD POOL - Reaching HERE." << std::endl;
+
     // We use Position::set() to set root position across threads. But there are
     // some StateInfo fields (previous, pliesFromNull, capturedPiece) that cannot
     // be deduced from a fen string, so set() clears them and they are set from
@@ -368,6 +366,7 @@ std::cout << "MaLa: I'm in the threads pool starting thinking." << std::endl;
     for (auto&& th : threads)
         th->wait_for_search_finished();
 
+std::cout << "MaLa THREAD POOL - OR HERE." << std::endl;
     main_thread()->start_searching();
 }
 

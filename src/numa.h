@@ -41,7 +41,7 @@
 
 // We support linux very well, but we explicitly do NOT support Android,
 // because there is no affected systems, not worth maintaining.
-#if defined(__linux__) && !defined(__ANDROID__)
+#if defined(__linux__) && !defined(__ANDROID__) && !defined(__EMSCRIPTEN__)
     #if !defined(_GNU_SOURCE)
         #define _GNU_SOURCE
     #endif
@@ -417,7 +417,7 @@ std::set<CpuIndex> readCacheMembers(const T* info, Pred&& is_cpu_allowed) {
 
 #endif
 
-#if defined(__linux__) && !defined(__ANDROID__)
+#if defined(__linux__) && !defined(__ANDROID__) && !defined(__EMSCRIPTEN__)
 
 inline std::set<CpuIndex> get_process_affinity() {
 
@@ -546,7 +546,7 @@ class NumaConfig {
 
 std::cout << "MaLa: Numa config from System - SystemThreadsNB - " << SYSTEM_THREADS_NB << std::endl;
 
-#if !((defined(__linux__) && !defined(__ANDROID__)) || defined(_WIN64))
+#if !((defined(__linux__) && !defined(__ANDROID__)) && !defined(__EMSCRIPTEN__) || defined(_WIN64))
         // Fallback for unsupported systems.
         for (CpuIndex c = 0; c < SYSTEM_THREADS_NB; ++c)
             cfg.add_cpu_to_node(NumaIndex{0}, c);
@@ -840,7 +840,7 @@ std::cout << "MaLa: numa context config string - " << str << std::endl;
         if (n >= nodes.size() || nodes[n].size() == 0)
             std::exit(EXIT_FAILURE);
 
-#if defined(__linux__) && !defined(__ANDROID__)
+#if defined(__linux__) && !defined(__ANDROID__) && !defined(__EMSCRIPTEN__)
 
         cpu_set_t* mask = CPU_ALLOC(highestCpuIndex + 1);
         if (mask == nullptr)

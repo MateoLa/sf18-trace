@@ -53,7 +53,7 @@ template<typename... Ts>
 overload(Ts...) -> overload<Ts...>;
 
 void UCIEngine::print_info_string(std::string_view str) {
-std::cout << "MaLa: Engine. Trying to Verify Networks: " << str << std::endl;
+std::cout << "MaLa: UCI. REPLICA: " << str << std::endl;
 
     sync_cout_start();
     for (auto& line : split(str, "\n"))
@@ -93,6 +93,7 @@ void UCIEngine::loop() {
     for (int i = 1; i < cli.argc; ++i)
         cmd += std::string(cli.argv[i]) + " ";
 
+std::cout << "MaLa LOOP Command: " << cmd << std::endl;
     do
     {
         if (cli.argc == 1
@@ -118,7 +119,7 @@ void UCIEngine::uci_command(std::string cmd) {
 
 std::cout << "MaLa ONE STEP Command: " << cmd << std::endl;
 std::cout << "MaLa ONE STEP Token: " << token << std::endl;
-std::cout << "MaLa One Step ENGINE visualize: " << engine.visualize() << std::endl;
+// std::cout << "MaLa One Step ENGINE visualize: " << engine.visualize() << std::endl;
 
 
     if (token == "quit" || token == "stop")

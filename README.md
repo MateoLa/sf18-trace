@@ -149,7 +149,10 @@ By default it runs in one thread and you can optionally config more by the setop
 setoption name Treads value 4
 ```
 
-When using Emscripten's `-s MODULARIZE=1` the generated factory function does not execute main() automatically. 
+When using Emscripten's `-s MODULARIZE=1` the generated factory function does not execute main() automatically.
+
+How to set Numa.cpp hardware_concurrency()????
+`PTHREAD_POOL_SIZE` sets the "MaxThreads" variable into the engine.cpp Threads option. Is the limit to the "setoption name Threads value <nr>" uci command.
 
 
 #### Prerequisites
@@ -235,7 +238,7 @@ To understand Stockfish: <br>
 [Bitboards](/docs/bitboards.md)
 [Bitboards in Chess](/docs/bitboards_in_chess.md)
 [Debugging](/docs/debugging.md)
-[Threads](/docs/threads.md)
+[Trace Stockfish execution](/docs/tracing-sf.md)
 
 
 ### Acknowledgements

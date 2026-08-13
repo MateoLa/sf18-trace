@@ -201,12 +201,12 @@ void Network<Arch, Transformer>::verify(std::string                             
                                         const std::function<void(std::string_view)>& f) const {
     if (evalfilePath.empty())
         evalfilePath = evalFile.defaultName;
-std::cout << "MaLa: into Network. VERIFY - evalfilePath: " << evalfilePath << std::endl;
-std::cout << "MaLa: into Network. VERIFY - evalfileCurrent: " << std::string(evalFile.current) << std::endl;
+std::cout << "MaLa: NETWORK VERIFY - evalfilePath: " << evalfilePath << std::endl;
+std::cout << "MaLa: NETWORK VERIFY - evalfileCurrent: " << std::string(evalFile.current) << std::endl;
 
     if (std::string(evalFile.current) != evalfilePath)
     {
-std::cout << "MaLa: into Network. Verifying NET - I'm an if." << std::endl;
+std::cout << "MaLa NETWORK. Verifying - AN IF." << std::endl;
 
         if (f)
         {
@@ -231,10 +231,7 @@ std::cout << "MaLa: into Network. Verifying NET - I'm an if." << std::endl;
 
     if (f)
     {
-std::cout << "MaLa: into Network. Verifying NET - I'm the 2nd if." << std::endl;
-std::string mala = "MaLa";
-f(mala);
-
+std::cout << "MaLa NETWORK. Verifying - THE 2nd IF." << std::endl;
         size_t size = sizeof(featureTransformer) + sizeof(Arch) * LayerStacks;
         f("NNUE evaluation using " + evalfilePath + " (" + std::to_string(size / (1024 * 1024))
           + "MiB, (" + std::to_string(featureTransformer.TotalInputDimensions) + ", "
@@ -242,7 +239,7 @@ f(mala);
           + std::to_string(network[0].FC_0_OUTPUTS) + ", " + std::to_string(network[0].FC_1_OUTPUTS)
           + ", 1))");
     } else {
-std::cout << "MaLa: into Network. VERIFYING - There's NO FUNCTION" << std::endl;
+std::cout << "MaLa: NETWORK. VERIFYING - There's NO FUNCTION" << std::endl;
     }
 
 }

@@ -273,13 +273,11 @@ void Engine::set_ponderhit(bool b) { threads.main_manager()->ponder = b; }
 // network related
 
 void Engine::verify_networks() const {
-std::cout << "MaLa: into Engine. VERIFY NETWORKS" << std::endl;
+std::cout << "MaLa ENGINE - VERIFY NETWORKS" << std::endl;
 std::cout << "Mala: NUMA CONFIG: " << get_numa_config_as_string() << std::endl;
 
     networks->big.verify(options["EvalFile"], onVerifyNetworks);
     networks->small.verify(options["EvalFileSmall"], onVerifyNetworks);
-std::string mala = "MaLa";
-
 
     auto statuses = networks.get_status_and_errors();
     for (size_t i = 0; i < statuses.size(); ++i)
@@ -307,7 +305,7 @@ std::string mala = "MaLa";
         {
             message += " " + *error;
         }
-std::cout << "MaLa: engine. Messages Loop: " << message << std::endl;
+std::cout << "MaLa ENGINE - Messages LOOP: " << message << std::endl;
         onVerifyNetworks(message);
     }
 }

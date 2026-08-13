@@ -25,6 +25,10 @@
 #include "tune.h"
 #include "uci.h"
 
+#ifdef __EMSCRIPTEN__
+#include <emscripten.h>
+#endif
+
 
 using namespace Stockfish;
 
@@ -45,6 +49,8 @@ std::cout << "MaLa debug: Init done" << std::endl;
     uciP = new UCIEngine(argc, argv);
 
     Tune::init(uciP->engine_options());
+
+    emscripten_exit_with_live_runtime();
 #else
     auto uci = std::make_unique<UCIEngine>(argc, argv);
 

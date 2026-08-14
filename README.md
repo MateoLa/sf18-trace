@@ -32,11 +32,13 @@ isready
 position startpos
 position fen rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR w KQkq - 0 1
 position fen 4r1k1/r1q2ppp/ppp2n2/4P3/5Rb1/1N1BQ3/PPP3PP/R5K1 w - - 1 17
-# start the calculation
+go # [depth / movetime / infinite] START the Calculation
 go depth 20  # by depth
 go movetime 5000  # by time (calculate for 5 seconds)
 quit
 ```
+
+The bestmove is the standard output response sent by Stockfish after finishing a position analysis (after the GO command). An optinal token "ponder" in the response is the move Stockfish expects the opponent to play next.
 
 
 #### WebAssembly 
@@ -78,12 +80,10 @@ In main.cpp, the uci->loop():
     } while (token != "quit" && cli.argc == 1);  // The command-line arguments are one-shot
 ```
 
-We create the `uci_step()` function to be called form JS avoinding the loop and the I/O method "getline(std::cin, cmd)".
+We create an `uci_command()` function to avoid the loop and the I/O method. This function will be exported and called from JS to evaluate each game movement.
 
 
 #### The UCIEngine class
-
-We need to export the UCIEngine class to JS.
 
 ```C++
 UCIEngine::UCIEngine(int argc, char** argv) :
@@ -99,35 +99,26 @@ UCIEngine::UCIEngine(int argc, char** argv) :
 }
 ```
 
-The argument `char* argv[]` (or char** argv) is a pointer to a pointer (double pointer) and Emscripten does not have a direct built-in type mapping for it. We can try refactoring the class to accept a `const std::vector<std::string>` instead of the double pointer, but it's much easier to refactor the class so it doesn't take arguments.
+The argument `char* argv[]` (or char** argv) is a pointer to a pointer (double pointer) and Emscripten does not have a direct built-in type mapping for it.
 
-`cli(argc, argv)` is an instance of `CommandLine` which is used to get the loop I/O commands `cmd += std::string(cli.argv[i])` but we going to use our `uci_step(token)` function directly from JS, so we don't need "cli".
+`cli(argc, argv)` is an instance of `CommandLine` which is used to get the loop I/O commands.
 
 ```C++
 Engine::Engine(std::optional<std::string> path) :
     binaryDirectory(path ? CommandLine::get_binary_directory(*path) : ""),
 ```
 
-In the engine, the argument `argv[0] = path` is optional, and it is used to "get the binary directory" `binaryDirectory = argv0` to load the nnue networks.
+In the engine, the argument `argv[0] = path` is optional, and it is used to "get the binary directory" `binaryDirectory = argv0` to load the NNUE networks.
 
 When you call main() with no arguments, argv[0] is auto-generated. Emscripten automatically inserts a dummy program name (usually ./this.program) as the first element. In WebAssembly path = `./this.programm` while in C++ path = `./stockfish`.
 
-In C++ workingDirectory = ~/path_to_your_stockfish/src <br>
-In C++ binaryDirectory = ~/path_to_your_stockfish/src/
+In WebAssembly traditional filesystem paths are generally unsupported. By default, there is no root directory and the sandbox relies on simulated in-memory filesystems.
 
-In wasm workingDirectory = / <br>
-In wasm binaryDirectory = // 
-
-This is because `CommandLine::get_working_directory()` is based on `getcwd`. In WebAssembly traditional filesystem paths are generally unsupported. By default, there is no root directory and the sandbox relies on simulated in-memory filesystems.
-
-In WebAssembly, files that you want to access should be preloaded or embedded into the virtual file system. Preloading generates a virual file system that corresponds to the file system structure at compile time, relative to the current directory.
-
-2 solutions can be applied: <br>
+2 solutions can be applied to load the networks: <br>
     * Mount a filesystem - initialize a filesystem backend like IndexedDB or NodeFS or pre-polulate memory using `--preload-file` <br>
     * Use Emscripten File System API - instead of getcwd use `FS.cwd()`
 
-"getcwd" is a C++ POSIX api that queries the system's environment while "FS.cwd" stays locked to the Emscripten root. <br>
-We could try to standarize path resolution between C++ and Emscripten but first we going to solve this problem using "preload-file".
+In WebAssembly, files that you want to access can be preloaded or embedded into the virtual file system. Preloading generates a virual file system that corresponds to the file system structure at compile time, relative to the current directory.
 
 When compiling, the NNUE files are downloaded from the network through the net.sh script which uses the file names defined in "evaluate.h".
 
@@ -146,13 +137,13 @@ By default it runs in one thread and you can optionally config more by the setop
 
 ```sh
 ./stockfish 
-setoption name Treads value 4
+setoption name Threads value 4
 ```
 
 When using Emscripten's `-s MODULARIZE=1` the generated factory function does not execute main() automatically.
 
-How to set Numa.cpp hardware_concurrency()????
-`PTHREAD_POOL_SIZE` sets the "MaxThreads" variable into the engine.cpp Threads option. Is the limit to the "setoption name Threads value <nr>" uci command.
+Emscripten cannot spawn new web workers dynamically from inside a running pthread if the thread pool is exhausted or uninitialized. Because browsers restrict synchronous worker creation and blocking operations on the main thread, Emscripten relies on a pre-allocated pool of Web Workers defined at startup. <br>
+The pool must be defined by `-s PTHREAD_POOL_SIZE` and the setoption value can't be grater.
 
 
 #### Prerequisites

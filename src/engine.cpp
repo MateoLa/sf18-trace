@@ -156,8 +156,8 @@ std::cout << "MaLa: EvalFile big Option ADDED" << std::endl;
 
     load_networks();
     resize_threads();
-std::cout << "MaLa debugging: Threads Resized" << std::endl;
 std::cout << "MaLa: Options " << options << std::endl;
+std::cout << "MaLa: Max Threads: " << MaxThreads << std::endl;
 }
 
 std::uint64_t Engine::perft(const std::string& fen, Depth depth, bool isChess960) {
@@ -251,8 +251,8 @@ void Engine::set_numa_config_from_option(const std::string& o) {
 }
 
 void Engine::resize_threads() {
+std::cout << "MaLa Engine - RESIZE CALLED." << std::endl;
     threads.wait_for_search_finished();
-std::cout << "MaLa debugging: resizing threads" << std::endl;
 
     threads.set(numaContext.get_numa_config(), {options, threads, tt, sharedHists, networks},
                 updateContext);
@@ -260,7 +260,8 @@ std::cout << "MaLa debugging: resizing threads" << std::endl;
     // Reallocate the hash with the new threadpool size
     set_tt_size(options["Hash"]);
     threads.ensure_network_replicated();
-std::cout << "MaLa debug: threads RESIZED" << std::endl;
+std::cout << "MaLa Engine - threads RESIZED" << std::endl;
+std::cout << "MaLa Engine - Nr of Threads: " << threads.size() << std::endl;
 }
 
 void Engine::set_tt_size(size_t mb) {

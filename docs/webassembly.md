@@ -126,6 +126,11 @@ This illustrates how ccall() is used to call the exported function.
 `emscripten_runtime_keepalive_pop()` decrements one count from the active keepalive reference stack.
 
 
+#### Threads
+
+Emscripten cannot spawn new web workers dynamically from inside a running pthread if the thread pool is exhausted or uninitialized. Because browsers restrict synchronous worker creation and blocking operations on the main thread, Emscripten relies on a pre-allocated pool of Web Workers defined at startup.
+
+
 #### Numa
 
 WebAssembly and Emscripten do not support NUMA (Non-Uniform Memory Access) architectures or multiple distinct physical memory nodes, as WebAssembly operates on a single, uniform, sandboxed linear memory space.

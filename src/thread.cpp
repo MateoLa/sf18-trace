@@ -56,10 +56,6 @@ Thread::Thread(Search::SharedState&                    sharedState,
 
 std::cout << "MaLa new THREAD" << std::endl;
 std::cout << "(Parked in idle_loop by a startup routine right after the thread launches and until work is assigned)" << std::endl;
-std::cout << "MaLa debug: numaN - " << numaN << std::endl;
-std::cout << "MaLa debug: Total Numa Count - " << totalNumaCount << std::endl;
-std::cout << "MaLa debug: exit state: " << exit << std::endl;
-
     wait_for_search_finished();
 
 std::cout << "MaLa: before job" << std::endl;
@@ -102,9 +98,8 @@ void Thread::clear_worker() {
 
 // Blocks on the condition variable until the thread has finished searching
 void Thread::wait_for_search_finished() {
-std::cout << "MaLa WAITING for SEARCH - Lock" << std::endl;
     std::unique_lock<std::mutex> lk(mutex);
-std::cout << "MaLa: THREAD - Block until signal (searching is 0?) - " << searching << std::endl;
+std::cout << "MaLa WAITING for SEARCH - Lock (searching is 0?) - " << searching << std::endl;
     cv.wait(lk, [&] { return !searching; });
 std::cout << "MaLa THREAD Ends Searching." << std::endl;
 }
@@ -227,7 +222,7 @@ void ThreadPool::set(const NumaConfig&                           numaConfig,
         auto threadsPerNode = counts;
         counts.clear();
 
-std::cout << "MaLa debugging: requested - " << requested << std::endl;                                                       
+std::cout << "MaLa Threads - Requested - " << requested << std::endl;                                                       
         while (threads.size() < requested)
         {
             const size_t    threadId      = threads.size();
@@ -245,11 +240,7 @@ std::cout << "MaLa debugging: requested - " << requested << std::endl;
                 auto binder = doBindThreads ? OptionalThreadToNumaNodeBinder(numaConfig, numaId)
                                                        : OptionalThreadToNumaNodeBinder(numaId);
 
-std::cout << "MaLa threads Set - size: " << threads.size() << std::endl;
-std::cout << "MaLa threads Set - manager: " << manager.get() << std::endl;
-std::cout << "MaLa threads Set - thread Id: " << threadId << std::endl;
-std::cout << "MaLa threads Set - Numas: " << counts[numaId] << std::endl;
-
+std::cout << "MaLa Threads - size: " << threads.size() << std::endl;
                 threads.emplace_back(std::make_unique<Thread>(sharedState, std::move(manager),
                                                                          threadId, counts[numaId]++,
                                                                          threadsPerNode[numaId], binder));
@@ -274,6 +265,7 @@ void ThreadPool::clear() {
     if (threads.size() == 0)
         return;
 
+std::cout << "MaLa THREADS - Clear content." << std::endl;
     for (auto&& th : threads)
         th->clear_worker();
 

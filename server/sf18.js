@@ -92,164 +92,29 @@ if (ENVIRONMENT_IS_PTHREAD) {
 
 // --pre-jses are emitted after the Module integration code, so that they can
 // refer to Module (if they choose; they can also define Module)
-// include: /tmp/tmpj6cwfomz.js
-if (!Module["expectedDataFileDownloads"]) Module["expectedDataFileDownloads"] = 0;
-
-Module["expectedDataFileDownloads"]++;
-
-(() => {
-  // Do not attempt to redownload the virtual filesystem data when in a pthread or a Wasm Worker context.
-  var isPthread = typeof ENVIRONMENT_IS_PTHREAD != "undefined" && ENVIRONMENT_IS_PTHREAD;
-  var isWasmWorker = typeof ENVIRONMENT_IS_WASM_WORKER != "undefined" && ENVIRONMENT_IS_WASM_WORKER;
-  if (isPthread || isWasmWorker) return;
-  async function loadPackage(metadata) {
-    var PACKAGE_PATH = "";
-    if (typeof window === "object") {
-      PACKAGE_PATH = window["encodeURIComponent"](window.location.pathname.substring(0, window.location.pathname.lastIndexOf("/")) + "/");
-    } else if (typeof process === "undefined" && typeof location !== "undefined") {
-      // web worker
-      PACKAGE_PATH = encodeURIComponent(location.pathname.substring(0, location.pathname.lastIndexOf("/")) + "/");
-    }
-    var PACKAGE_NAME = "../server/sf18.data";
-    var REMOTE_PACKAGE_BASE = "sf18.data";
-    var REMOTE_PACKAGE_NAME = Module["locateFile"] ? Module["locateFile"](REMOTE_PACKAGE_BASE, "") : REMOTE_PACKAGE_BASE;
-    var REMOTE_PACKAGE_SIZE = metadata["remote_package_size"];
-    async function fetchRemotePackage(packageName, packageSize) {
-      if (!Module["dataFileDownloads"]) Module["dataFileDownloads"] = {};
-      try {
-        var response = await fetch(packageName);
-      } catch (e) {
-        throw new Error(`Network Error: ${packageName}`, {
-          e
-        });
-      }
-      if (!response.ok) {
-        throw new Error(`${response.status}: ${response.url}`);
-      }
-      const chunks = [];
-      const headers = response.headers;
-      const total = Number(headers.get("Content-Length") || packageSize);
-      let loaded = 0;
-      Module["setStatus"] && Module["setStatus"]("Downloading data...");
-      const reader = response.body.getReader();
-      while (1) {
-        var {done, value} = await reader.read();
-        if (done) break;
-        chunks.push(value);
-        loaded += value.length;
-        Module["dataFileDownloads"][packageName] = {
-          loaded,
-          total
-        };
-        let totalLoaded = 0;
-        let totalSize = 0;
-        for (const download of Object.values(Module["dataFileDownloads"])) {
-          totalLoaded += download.loaded;
-          totalSize += download.total;
-        }
-        Module["setStatus"] && Module["setStatus"](`Downloading data... (${totalLoaded}/${totalSize})`);
-      }
-      const packageData = new Uint8Array(chunks.map(c => c.length).reduce((a, b) => a + b, 0));
-      let offset = 0;
-      for (const chunk of chunks) {
-        packageData.set(chunk, offset);
-        offset += chunk.length;
-      }
-      return packageData.buffer;
-    }
-    var fetchPromise;
-    var fetched = Module["getPreloadedPackage"] && Module["getPreloadedPackage"](REMOTE_PACKAGE_NAME, REMOTE_PACKAGE_SIZE);
-    if (!fetched) {
-      // Note that we don't use await here because we want to execute the
-      // the rest of this function immediately.
-      fetchPromise = fetchRemotePackage(REMOTE_PACKAGE_NAME, REMOTE_PACKAGE_SIZE);
-    }
-    async function runWithFS(Module) {
-      function assert(check, msg) {
-        if (!check) throw new Error(msg);
-      }
-      for (var file of metadata["files"]) {
-        var name = file["filename"];
-        Module["addRunDependency"](`fp ${name}`);
-      }
-      async function processPackageData(arrayBuffer) {
-        assert(arrayBuffer, "Loading data file failed.");
-        assert(arrayBuffer.constructor.name === ArrayBuffer.name, "bad input to processPackageData " + arrayBuffer.constructor.name);
-        var byteArray = new Uint8Array(arrayBuffer);
-        var curr;
-        // Reuse the bytearray from the XHR as the source for file reads.
-        for (var file of metadata["files"]) {
-          var name = file["filename"];
-          var data = byteArray.subarray(file["start"], file["end"]);
-          // canOwn this data in the filesystem, it is a slice into the heap that will never change
-          Module["FS_createDataFile"](name, null, data, true, true, true);
-          Module["removeRunDependency"](`fp ${name}`);
-        }
-        Module["removeRunDependency"]("datafile_../server/sf18.data");
-      }
-      Module["addRunDependency"]("datafile_../server/sf18.data");
-      if (!Module["preloadResults"]) Module["preloadResults"] = {};
-      Module["preloadResults"][PACKAGE_NAME] = {
-        fromCache: false
-      };
-      if (!fetched) {
-        fetched = await fetchPromise;
-      }
-      processPackageData(fetched);
-    }
-    if (Module["calledRun"]) {
-      runWithFS(Module);
-    } else {
-      if (!Module["preRun"]) Module["preRun"] = [];
-      Module["preRun"].push(runWithFS);
-    }
-  }
-  loadPackage({
-    "files": [ {
-      "filename": "/nn-37f18f62d772.nnue",
-      "start": 0,
-      "end": 3519630
-    }, {
-      "filename": "/nn-c288c895ea92.nnue",
-      "start": 3519630,
-      "end": 112439224
-    } ],
-    "remote_package_size": 112439224
-  });
-})();
-
-// end include: /tmp/tmpj6cwfomz.js
-// include: /tmp/tmp_vx66ouq.js
-// All the pre-js content up to here must remain later on, we need to run
-// it.
-if ((typeof ENVIRONMENT_IS_WASM_WORKER != "undefined" && ENVIRONMENT_IS_WASM_WORKER) || (typeof ENVIRONMENT_IS_PTHREAD != "undefined" && ENVIRONMENT_IS_PTHREAD) || (typeof ENVIRONMENT_IS_AUDIO_WORKLET != "undefined" && ENVIRONMENT_IS_AUDIO_WORKLET)) Module["preRun"] = [];
-
-var necessaryPreJSTasks = Module["preRun"].slice();
-
-// end include: /tmp/tmp_vx66ouq.js
 // include: emscripten/pre.js
 /*
-let memory = new WebAssembly.Memory({ initial: 512, maximum: 1024});
+// Not needed when this values are set in Makefile.
+let memory = new WebAssembly.Memory({ 
+    initial: 2048,       // In pages (1 page = 64KB). 2048 = 128MB 
+    maximum: 32768,      // 2GB -> 2*(1024*1024*1024)/(64*1024) 
+    shared: true
+});
 Module["memory"] = memory;
 
 Module["print"] = (text) => { self.postMessage(text) };
 
-Module["printErr"] = (err) => { console.error("MaLa C++ error: ", err); };
+Module["printErr"] = (err) => { console.warn("MaLa C++ error: ", err); };
 
-Module["onRuntimeInitialized"] = () => { console.log('Module loaded: ', Module); }
+Module["onRuntimeInitialized"] = () => { 
+    console.log('MaLa Module Loaded');
+    Module.wasm_uci = Module.cwrap('wasm_uci', null, ['string']);
+}
 */ Module["terminate"] = () => {
   PThread.terminateAllThreads();
 };
 
 // end include: emscripten/pre.js
-// include: /tmp/tmpfsy8te0b.js
-if (!Module["preRun"]) throw "Module.preRun should exist because file support used it; did a pre-js delete it?";
-
-necessaryPreJSTasks.forEach(task => {
-  if (Module["preRun"].indexOf(task) < 0) throw "All preRun tasks that exist before user pre-js code should remain after; did you replace Module or modify Module.preRun?";
-});
-
-// end include: /tmp/tmpfsy8te0b.js
 var arguments_ = [];
 
 var thisProgram = "./this.program";
@@ -737,7 +602,7 @@ function initMemory() {
     wasmMemory = Module["wasmMemory"];
   } else {
     var INITIAL_MEMORY = Module["INITIAL_MEMORY"] || 134217728;
-    assert(INITIAL_MEMORY >= 131072, "INITIAL_MEMORY should be larger than STACK_SIZE, was " + INITIAL_MEMORY + "! (STACK_SIZE=" + 131072 + ")");
+    assert(INITIAL_MEMORY >= 5242880, "INITIAL_MEMORY should be larger than STACK_SIZE, was " + INITIAL_MEMORY + "! (STACK_SIZE=" + 5242880 + ")");
     /** @suppress {checkTypes} */ wasmMemory = new WebAssembly.Memory({
       "initial": INITIAL_MEMORY / 65536,
       // In theory we should not need to emit the maximum if we want "unlimited"
@@ -4566,11 +4431,29 @@ function ___syscall_openat(dirfd, path, flags, varargs) {
 
 var __abort_js = () => abort("native code called abort()");
 
+var __emscripten_fs_load_embedded_files = ptr => {
+  dbg("preloading data files");
+  do {
+    var name_addr = (growMemViews(), HEAPU32)[SAFE_HEAP_INDEX((growMemViews(), HEAPU32), ((ptr) >> 2), "loading")];
+    ptr += 4;
+    var len = (growMemViews(), HEAPU32)[SAFE_HEAP_INDEX((growMemViews(), HEAPU32), ((ptr) >> 2), "loading")];
+    ptr += 4;
+    var content = (growMemViews(), HEAPU32)[SAFE_HEAP_INDEX((growMemViews(), HEAPU32), ((ptr) >> 2), "loading")];
+    ptr += 4;
+    var name = UTF8ToString(name_addr);
+    dbg(`preloading files: ${name}`);
+    FS.createPath("/", PATH.dirname(name), true, true);
+    // canOwn this data in the filesystem, it is a slice of wasm memory that will never change
+    FS.createDataFile(name, null, (growMemViews(), HEAP8).subarray(content, content + len), true, true, true);
+  } while ((growMemViews(), HEAPU32)[SAFE_HEAP_INDEX((growMemViews(), HEAPU32), ((ptr) >> 2), "loading")]);
+  dbg("done preloading data files");
+};
+
 var __emscripten_init_main_thread_js = tb => {
   // Pass the thread address to the native code where they are stored in wasm
   // globals which act as a form of TLS. Global constructors trying
   // to access this value will read the wrong value, but that is UB anyway.
-  __emscripten_thread_init(tb, /*is_main=*/ !ENVIRONMENT_IS_WORKER, /*is_runtime=*/ 1, /*can_block=*/ !ENVIRONMENT_IS_WEB, /*default_stacksize=*/ 131072, /*start_profiling=*/ false);
+  __emscripten_thread_init(tb, /*is_main=*/ !ENVIRONMENT_IS_WORKER, /*is_runtime=*/ 1, /*can_block=*/ !ENVIRONMENT_IS_WEB, /*default_stacksize=*/ 5242880, /*start_profiling=*/ false);
   PThread.threadInitTLS();
 };
 
@@ -4587,7 +4470,7 @@ var handleException = e => {
   checkStackCookie();
   if (e instanceof WebAssembly.RuntimeError) {
     if (_emscripten_stack_get_current() <= 0) {
-      err("Stack overflow detected.  You can try increasing -sSTACK_SIZE (currently set to 131072)");
+      err("Stack overflow detected.  You can try increasing -sSTACK_SIZE (currently set to 5242880)");
     }
   }
   dbg("handleException: got unexpected exception, calling quit_");
@@ -5277,8 +5160,6 @@ Module["FS_createPath"] = FS_createPath;
 
 Module["FS_createDevice"] = FS_createDevice;
 
-Module["FS"] = FS;
-
 Module["FS_createDataFile"] = FS_createDataFile;
 
 Module["FS_createLazyFile"] = FS_createLazyFile;
@@ -5287,7 +5168,7 @@ var missingLibrarySymbols = [ "writeI53ToI64", "writeI53ToI64Clamped", "writeI53
 
 missingLibrarySymbols.forEach(missingLibrarySymbol);
 
-var unexportedSymbols = [ "run", "out", "err", "callMain", "abort", "wasmExports", "HEAPF32", "HEAPF64", "HEAP8", "HEAPU8", "HEAP16", "HEAPU16", "HEAP32", "HEAPU32", "HEAP64", "HEAPU64", "WasmSourceMap", "writeStackCookie", "checkStackCookie", "prettyPrint", "INT53_MAX", "INT53_MIN", "bigintToI53Checked", "stackSave", "stackRestore", "stackAlloc", "ptrToString", "zeroMemory", "exitJS", "getHeapMax", "growMemory", "ENV", "ERRNO_CODES", "strError", "DNS", "Protocols", "Sockets", "timers", "warnOnce", "readEmAsmArgsArray", "getExecutableName", "handleException", "keepRuntimeAlive", "runtimeKeepalivePush", "runtimeKeepalivePop", "callUserCallback", "maybeExit", "asyncLoad", "alignMemory", "mmapAlloc", "wasmTable", "wasmMemory", "getUniqueRunDependency", "noExitRuntime", "addOnPreRun", "addOnPostRun", "ccall", "freeTableIndexes", "functionsInTableMap", "setValue", "getValue", "PATH", "PATH_FS", "UTF8Decoder", "UTF8ArrayToString", "UTF8ToString", "stringToUTF8Array", "stringToUTF8", "lengthBytesUTF8", "intArrayFromString", "UTF16Decoder", "stringToUTF8OnStack", "writeArrayToMemory", "JSEvents", "specialHTMLTargets", "findCanvasEventTarget", "currentFullscreenStrategy", "restoreOldWindowedStyle", "UNWIND_CACHE", "ExitStatus", "getEnvStrings", "checkWasiClock", "doReadv", "doWritev", "initRandomFill", "randomFill", "emSetImmediate", "emClearImmediate_deps", "emClearImmediate", "promiseMap", "uncaughtExceptionCount", "exceptionLast", "exceptionCaught", "Browser", "requestFullscreen", "requestFullScreen", "setCanvasSize", "getUserMedia", "createContext", "getPreloadedImageData__data", "wget", "MONTH_DAYS_REGULAR", "MONTH_DAYS_LEAP", "MONTH_DAYS_REGULAR_CUMULATIVE", "MONTH_DAYS_LEAP_CUMULATIVE", "SYSCALLS", "preloadPlugins", "FS_createPreloadedFile", "FS_modeStringToFlags", "FS_getMode", "FS_stdin_getChar_buffer", "FS_stdin_getChar", "FS_readFile", "FS_root", "FS_mounts", "FS_devices", "FS_streams", "FS_nextInode", "FS_nameTable", "FS_currentPath", "FS_initialized", "FS_ignorePermissions", "FS_filesystems", "FS_syncFSRequests", "FS_lookupPath", "FS_getPath", "FS_hashName", "FS_hashAddNode", "FS_hashRemoveNode", "FS_lookupNode", "FS_createNode", "FS_destroyNode", "FS_isRoot", "FS_isMountpoint", "FS_isFile", "FS_isDir", "FS_isLink", "FS_isChrdev", "FS_isBlkdev", "FS_isFIFO", "FS_isSocket", "FS_flagsToPermissionString", "FS_nodePermissions", "FS_mayLookup", "FS_mayCreate", "FS_mayDelete", "FS_mayOpen", "FS_checkOpExists", "FS_nextfd", "FS_getStreamChecked", "FS_getStream", "FS_createStream", "FS_closeStream", "FS_dupStream", "FS_doSetAttr", "FS_chrdev_stream_ops", "FS_major", "FS_minor", "FS_makedev", "FS_registerDevice", "FS_getDevice", "FS_getMounts", "FS_syncfs", "FS_mount", "FS_unmount", "FS_lookup", "FS_mknod", "FS_statfs", "FS_statfsStream", "FS_statfsNode", "FS_create", "FS_mkdir", "FS_mkdev", "FS_symlink", "FS_rename", "FS_rmdir", "FS_readdir", "FS_readlink", "FS_stat", "FS_fstat", "FS_lstat", "FS_doChmod", "FS_chmod", "FS_lchmod", "FS_fchmod", "FS_doChown", "FS_chown", "FS_lchown", "FS_fchown", "FS_doTruncate", "FS_truncate", "FS_ftruncate", "FS_utime", "FS_open", "FS_close", "FS_isClosed", "FS_llseek", "FS_read", "FS_write", "FS_mmap", "FS_msync", "FS_ioctl", "FS_writeFile", "FS_cwd", "FS_chdir", "FS_createDefaultDirectories", "FS_createDefaultDevices", "FS_createSpecialDirectories", "FS_createStandardStreams", "FS_staticInit", "FS_init", "FS_quit", "FS_findObject", "FS_analyzePath", "FS_createFile", "FS_forceLoadFile", "FS_absolutePath", "FS_createFolder", "FS_createLink", "FS_joinPath", "FS_mmapAlloc", "FS_standardizePath", "MEMFS", "TTY", "PIPEFS", "SOCKFS", "tempFixedLengthArray", "miniTempWebGLFloatBuffers", "miniTempWebGLIntBuffers", "GL", "AL", "GLUT", "EGL", "GLEW", "IDBStore", "SDL", "SDL_gfx", "waitAsyncPolyfilled", "print", "printErr", "jstoi_s", "PThread", "terminateWorker", "cleanupThread", "registerTLSInit", "spawnThread", "exitOnMainThread", "proxyToMainThread", "proxiedJSCallArgs", "invokeEntryPoint", "checkMailbox" ];
+var unexportedSymbols = [ "run", "out", "err", "callMain", "abort", "wasmExports", "HEAPF32", "HEAPF64", "HEAP8", "HEAPU8", "HEAP16", "HEAPU16", "HEAP32", "HEAPU32", "HEAP64", "HEAPU64", "WasmSourceMap", "writeStackCookie", "checkStackCookie", "prettyPrint", "INT53_MAX", "INT53_MIN", "bigintToI53Checked", "stackSave", "stackRestore", "stackAlloc", "ptrToString", "zeroMemory", "exitJS", "getHeapMax", "growMemory", "ENV", "ERRNO_CODES", "strError", "DNS", "Protocols", "Sockets", "timers", "warnOnce", "readEmAsmArgsArray", "getExecutableName", "handleException", "keepRuntimeAlive", "runtimeKeepalivePush", "runtimeKeepalivePop", "callUserCallback", "maybeExit", "asyncLoad", "alignMemory", "mmapAlloc", "wasmTable", "wasmMemory", "getUniqueRunDependency", "noExitRuntime", "addOnPreRun", "addOnPostRun", "ccall", "freeTableIndexes", "functionsInTableMap", "setValue", "getValue", "PATH", "PATH_FS", "UTF8Decoder", "UTF8ArrayToString", "UTF8ToString", "stringToUTF8Array", "stringToUTF8", "lengthBytesUTF8", "intArrayFromString", "UTF16Decoder", "stringToUTF8OnStack", "writeArrayToMemory", "JSEvents", "specialHTMLTargets", "findCanvasEventTarget", "currentFullscreenStrategy", "restoreOldWindowedStyle", "UNWIND_CACHE", "ExitStatus", "getEnvStrings", "checkWasiClock", "doReadv", "doWritev", "initRandomFill", "randomFill", "emSetImmediate", "emClearImmediate_deps", "emClearImmediate", "promiseMap", "uncaughtExceptionCount", "exceptionLast", "exceptionCaught", "Browser", "requestFullscreen", "requestFullScreen", "setCanvasSize", "getUserMedia", "createContext", "getPreloadedImageData__data", "wget", "MONTH_DAYS_REGULAR", "MONTH_DAYS_LEAP", "MONTH_DAYS_REGULAR_CUMULATIVE", "MONTH_DAYS_LEAP_CUMULATIVE", "SYSCALLS", "preloadPlugins", "FS_createPreloadedFile", "FS_modeStringToFlags", "FS_getMode", "FS_stdin_getChar_buffer", "FS_stdin_getChar", "FS_readFile", "FS", "FS_root", "FS_mounts", "FS_devices", "FS_streams", "FS_nextInode", "FS_nameTable", "FS_currentPath", "FS_initialized", "FS_ignorePermissions", "FS_filesystems", "FS_syncFSRequests", "FS_lookupPath", "FS_getPath", "FS_hashName", "FS_hashAddNode", "FS_hashRemoveNode", "FS_lookupNode", "FS_createNode", "FS_destroyNode", "FS_isRoot", "FS_isMountpoint", "FS_isFile", "FS_isDir", "FS_isLink", "FS_isChrdev", "FS_isBlkdev", "FS_isFIFO", "FS_isSocket", "FS_flagsToPermissionString", "FS_nodePermissions", "FS_mayLookup", "FS_mayCreate", "FS_mayDelete", "FS_mayOpen", "FS_checkOpExists", "FS_nextfd", "FS_getStreamChecked", "FS_getStream", "FS_createStream", "FS_closeStream", "FS_dupStream", "FS_doSetAttr", "FS_chrdev_stream_ops", "FS_major", "FS_minor", "FS_makedev", "FS_registerDevice", "FS_getDevice", "FS_getMounts", "FS_syncfs", "FS_mount", "FS_unmount", "FS_lookup", "FS_mknod", "FS_statfs", "FS_statfsStream", "FS_statfsNode", "FS_create", "FS_mkdir", "FS_mkdev", "FS_symlink", "FS_rename", "FS_rmdir", "FS_readdir", "FS_readlink", "FS_stat", "FS_fstat", "FS_lstat", "FS_doChmod", "FS_chmod", "FS_lchmod", "FS_fchmod", "FS_doChown", "FS_chown", "FS_lchown", "FS_fchown", "FS_doTruncate", "FS_truncate", "FS_ftruncate", "FS_utime", "FS_open", "FS_close", "FS_isClosed", "FS_llseek", "FS_read", "FS_write", "FS_mmap", "FS_msync", "FS_ioctl", "FS_writeFile", "FS_cwd", "FS_chdir", "FS_createDefaultDirectories", "FS_createDefaultDevices", "FS_createSpecialDirectories", "FS_createStandardStreams", "FS_staticInit", "FS_init", "FS_quit", "FS_findObject", "FS_analyzePath", "FS_createFile", "FS_forceLoadFile", "FS_absolutePath", "FS_createFolder", "FS_createLink", "FS_joinPath", "FS_mmapAlloc", "FS_standardizePath", "MEMFS", "TTY", "PIPEFS", "SOCKFS", "tempFixedLengthArray", "miniTempWebGLFloatBuffers", "miniTempWebGLIntBuffers", "GL", "AL", "GLUT", "EGL", "GLEW", "IDBStore", "SDL", "SDL_gfx", "waitAsyncPolyfilled", "print", "printErr", "jstoi_s", "PThread", "terminateWorker", "cleanupThread", "registerTLSInit", "spawnThread", "exitOnMainThread", "proxyToMainThread", "proxiedJSCallArgs", "invokeEntryPoint", "checkMailbox" ];
 
 unexportedSymbols.forEach(unexportedRuntimeSymbol);
 
@@ -5529,6 +5410,7 @@ function assignWasmImports() {
     /** @export */ __syscall_ioctl: ___syscall_ioctl,
     /** @export */ __syscall_openat: ___syscall_openat,
     /** @export */ _abort_js: __abort_js,
+    /** @export */ _emscripten_fs_load_embedded_files: __emscripten_fs_load_embedded_files,
     /** @export */ _emscripten_init_main_thread_js: __emscripten_init_main_thread_js,
     /** @export */ _emscripten_notify_mailbox_postmessage: __emscripten_notify_mailbox_postmessage,
     /** @export */ _emscripten_receive_on_main_thread_js: __emscripten_receive_on_main_thread_js,

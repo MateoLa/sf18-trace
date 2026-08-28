@@ -24,16 +24,16 @@ VPATH += :emscripten:../server
 LDFLAGS += -flto
 # LDFLAGS += --no-entry  # do not search or require main()
 LDFLAGS += --pre-js emscripten/pre.js
-LDFLAGS += --preload-file nn-c288c895ea92.nnue@nn-c288c895ea92.nnue
-LDFLAGS += --preload-file nn-37f18f62d772.nnue@nn-37f18f62d772.nnue
+LDFLAGS += --embed-file nn-c288c895ea92.nnue@nn-c288c895ea92.nnue
+LDFLAGS += --embed-file nn-37f18f62d772.nnue@nn-37f18f62d772.nnue
 LDFLAGS += -Wno-pthreads-mem-growth
 LDFLAGS += -s ENVIRONMENT="web,worker" -s EXIT_RUNTIME=0
 LDFLAGS += -s MODULARIZE=1 -s EXPORT_ES6=1 -s EXPORT_NAME="Stockfish" 
 LDFLAGS += -s USE_PTHREADS=1 -s MALLOC=mimalloc
 LDFLAGS += -s SHARED_MEMORY=1 -s PROXY_TO_PTHREAD=1 -s PTHREAD_POOL_SIZE=navigator.hardwareConcurrency
-LDFLAGS += -s STACK_SIZE=128KB
+LDFLAGS += -s STACK_SIZE=5MB
 LDFLAGS += -s ALLOW_MEMORY_GROWTH=1 -s INITIAL_MEMORY=128MB -s MAXIMUM_MEMORY=2GB
-LDFLAGS += -s FORCE_FILESYSTEM=1 -s EXPORTED_RUNTIME_METHODS="['FS', 'cwrap']"
+LDFLAGS += -s FORCE_FILESYSTEM=1 -s EXPORTED_RUNTIME_METHODS="['cwrap']"
 LDFLAGS += -s EXPORTED_FUNCTIONS="['_main', '_wasm_uci']"
 LDFLAGS += -s ALLOW_UNIMPLEMENTED_SYSCALLS
 # LDFLAGS += --bind
